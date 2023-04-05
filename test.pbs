@@ -1,0 +1,11 @@
+#PBS -lwalltime=00:10:00
+#PBS -lselect=1:ncpus=1:mem=24gb:ngpus=1:gpu_type=RTX6000:cpu_type=skylake
+#PBS -o test.out 
+#PBS -e test.err 
+
+module load anaconda3/personal
+module load cuda/11.2.2
+module load cudnn/8.2.4
+source activate msc
+
+python $HOME/msc/UNETR/test.py --infer_overlap=0.5 --data_dir=$HOME/datasets/BTCV/ --pretrained_dir=$HOME/msc/UNETR/pretrained_models/ --saved_checkpoint=ckpt
