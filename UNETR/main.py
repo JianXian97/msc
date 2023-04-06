@@ -96,7 +96,7 @@ parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added
 def main():
     args = parser.parse_args()
     args.amp = not args.noamp
-    args.logdir = "./runs/" + args.logdir
+    # args.logdir = "./runs/" + args.logdir
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
         print("Found total gpus", args.ngpus_per_node)
