@@ -17,7 +17,7 @@ import numpy as np
 import torch
 import torch.nn.parallel
 import torch.utils.data.distributed
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
 from torch.cuda.amp import GradScaler, autocast
 from utils.utils import distributed_all_gather
 
@@ -165,9 +165,9 @@ def run_training(
     post_label=None,
     post_pred=None,
 ):
-    writer = None
+    # writer = None
     if args.logdir is not None and args.rank == 0:
-        writer = SummaryWriter(log_dir=args.logdir)
+        # writer = SummaryWriter(log_dir=args.logdir)
         if args.rank == 0:
             print("Writing Tensorboard logs to ", args.logdir)
     scaler = None
@@ -189,8 +189,8 @@ def run_training(
                 "loss: {:.4f}".format(train_loss),
                 "time {:.2f}s".format(time.time() - epoch_time),
             )
-        if args.rank == 0 and writer is not None:
-            writer.add_scalar("train_loss", train_loss, epoch)
+        # if args.rank == 0 and writer is not None:
+        #     writer.add_scalar("train_loss", train_loss, epoch)
         b_new_best = False
         if (epoch + 1) % args.val_every == 0:
             if args.distributed:
@@ -213,8 +213,8 @@ def run_training(
                     val_avg_acc,
                     "time {:.2f}s".format(time.time() - epoch_time),
                 )
-                if writer is not None:
-                    writer.add_scalar("val_acc", val_avg_acc, epoch)
+                # if writer is not None:
+                    # writer.add_scalar("val_acc", val_avg_acc, epoch)
                 if val_avg_acc > val_acc_max:
                     print("new best ({:.6f} --> {:.6f}). ".format(val_acc_max, val_avg_acc))
                     val_acc_max = val_avg_acc
