@@ -8,4 +8,4 @@ module load cuda/11.2.2
 module load cudnn/8.2.4
 source activate msc
 
-python $HOME/msc/UNETR/main.py --feature_size=32 --batch_size=6 --logdir=$HOME/msc/UNETR/unetr_test --optim_lr=2e-4 --lrschedule=warmup_cosine --infer_overlap=0.5 --save_checkpoint --data_dir=$HOME/datasets/BTCV/ --workers=1 --distributed --save_checkpoint
+python $HOME/msc/UNETR/main.py --feature_size=32 --batch_size=6 --logdir=$HOME/msc/UNETR/unetr_test --optim_lr=2e-4 --lrschedule=warmup_cosine --infer_overlap=0.5 --save_checkpoint --data_dir=$HOME/datasets/BTCV/ --workers=1 --distributed
