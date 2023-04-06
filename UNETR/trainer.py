@@ -124,7 +124,7 @@ def val_epoch(model, loader, epoch, acc_func, args, model_inferer=None, post_lab
             else:
                 acc_list = acc.detach().cpu().numpy()
                 avg_acc = np.mean([np.nanmean(l) for l in acc_list])
-
+ 
             if args.rank == 0:
                 print(
                     "Val {}/{} {}/{}".format(epoch, args.max_epochs, idx, len(loader)),
