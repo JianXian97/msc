@@ -134,14 +134,14 @@ def val_epoch(model, loader, epoch, acc_func, args, model_inferer=None, post_lab
     return avg_acc
 
 
-def save_checkpoint(model, epoch, args, best_acc=0, optimizer=None, scheduler=None):
+def save_checkpoint(model, epoch, args, filename = "model.pt", best_acc=0, optimizer=None, scheduler=None):
     state_dict = model.state_dict() if not args.distributed else model.module.state_dict()
     save_dict = {"epoch": epoch, "best_acc": best_acc, "state_dict": state_dict}
     if optimizer is not None:
         save_dict["optimizer"] = optimizer.state_dict()
     if scheduler is not None:
         save_dict["scheduler"] = scheduler.state_dict()
-    filename = os.path.join(args.logdir, args.checkpoint_filename)
+    filename = os.path.join(args.logdir, filename)
     torch.save(save_dict, filename)
     print("Saving checkpoint", filename)
 
@@ -216,7 +216,7 @@ def run_training(
                     b_new_best = True
                     if args.rank == 0 and args.logdir is not None and args.save_checkpoint:
                         save_checkpoint(
-                            model, epoch, args, best_acc=val_acc_max, optimizer=optimizer, scheduler=scheduler
+                            model, epoch, args, filename=args.checkpoint_filename, best_acc=val_acc_max, optimizer=optimizer, scheduler=scheduler
                         )
             if args.rank == 0 and args.logdir is not None and args.save_checkpoint:
                 name = args.checkpoint_filename[:-3] + ".pt" 
