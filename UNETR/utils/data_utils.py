@@ -175,7 +175,7 @@ def get_loader_AMOS(args):
     datalist_json = os.path.join(data_dir, args.json_list)
     train_transform = transforms.Compose(
         [
-            transforms.LoadImaged(keys=["image_CT", "label_CT", "image_MRI", "label_MRI"]),
+            transforms.LoadImaged(keys=["image_MRI", "label_MRI","image_CT", "label_CT"]),
             transforms.AddChanneld(keys=["image_CT", "label_CT"]),
             transforms.Orientationd(keys=["image_CT", "label_CT"], axcodes="RAS"),
             transforms.Spacingd(
