@@ -97,7 +97,6 @@ parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added
 
 def main():
     args = parser.parse_args()
-    args.data_dir = "../datasets/AMOS"
     args.amp = not args.noamp
     # args.logdir = "./runs/" + args.logdir
     if args.distributed:
@@ -123,7 +122,6 @@ def main_worker(gpu, args):
     torch.cuda.set_device(args.gpu)
     torch.backends.cudnn.benchmark = True
     args.test_mode = False
-    print("args.data_dir", args.data_dir)
     loader = get_loader(args)
     print(args.rank, " gpu", args.gpu)
     if args.rank == 0:
