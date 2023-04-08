@@ -134,14 +134,14 @@ def val_epoch(model, loader, epoch, acc_func, args, model_inferer=None, post_lab
     return avg_acc
 
 
-def save_checkpoint(model, epoch, args, filename="model.pt", best_acc=0, optimizer=None, scheduler=None):
+def save_checkpoint(model, epoch, args, best_acc=0, optimizer=None, scheduler=None):
     state_dict = model.state_dict() if not args.distributed else model.module.state_dict()
     save_dict = {"epoch": epoch, "best_acc": best_acc, "state_dict": state_dict}
     if optimizer is not None:
         save_dict["optimizer"] = optimizer.state_dict()
     if scheduler is not None:
         save_dict["scheduler"] = scheduler.state_dict()
-    filename = os.path.join(args.logdir, filename)
+    filename = os.path.join(args.logdir, args.checkpoint_filename)
     torch.save(save_dict, filename)
     print("Saving checkpoint", filename)
 
@@ -219,10 +219,12 @@ def run_training(
                             model, epoch, args, best_acc=val_acc_max, optimizer=optimizer, scheduler=scheduler
                         )
             if args.rank == 0 and args.logdir is not None and args.save_checkpoint:
-                save_checkpoint(model, epoch, args, best_acc=val_acc_max, filename="model_final.pt")
+                name = args.checkpoint_filename[:-3] + ".pt" 
+                save_checkpoint(model, epoch, args, best_acc=val_acc_max, filename=name)
                 if b_new_best:
                     print("Copying to model.pt new best model!!!!")
-                    shutil.copyfile(os.path.join(args.logdir, "model_final.pt"), os.path.join(args.logdir, "model.pt"))
+                    
+                    shutil.copyfile(os.path.join(args.logdir, name), os.path.join(args.logdir, "model.pt"))
 
         if scheduler is not None:
             scheduler.step()
