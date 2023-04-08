@@ -65,13 +65,8 @@ class Sampler(torch.utils.data.Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
-def get_loader(args):
-    if "BTCV" in args.data_dir:
-        return get_loader_BTCV(args)
-    else:
-        return get_loader_AMOS(args)
 
-def get_loader_BTCV(args):
+def get_loader(args):
     data_dir = args.data_dir
     datalist_json = os.path.join(data_dir, args.json_list)
     train_transform = transforms.Compose(
@@ -169,92 +164,115 @@ def get_loader_BTCV(args):
 
     return loader
 
+from monai.config import KeysCollection
+from monai.transforms.intensity.array import ScaleIntensityRange, NormalizeIntensity
+from monai.utils.enums import TransformBackends
 
+class dynamicScaled(transforms.transform.MapTransform):
+    def __init__(self, 
+                 keys: KeysCollection, 
+                 img_key: str, 
+                 type_key:str, 
+                 a_min:float, 
+                 a_max:float, 
+                 b_min:float, 
+                 b_max:float): 
+        
+        super().__init__(keys, allow_missing_keys = False)
+        self.normalizer = NormalizeIntensity(subtrahend = None, divisor = None, nonzero = False, channel_wise = False, dtype = np.float32)
+        self.scaler = ScaleIntensityRange(a_min, a_max, b_min, b_max, clip = True, dtype = np.float32)
+        self.img_key = img_key
+        self.type_key = type_key
+
+    backend = [TransformBackends.TORCH, TransformBackends.NUMPY]
+
+    def __call__(self, data):
+        d = dict(data)         
+        if d[self.type_key] == 'CT': 
+            d[self.img_key] = self.scaler(d[self.img_key])
+        else:
+            d[self.img_key] = self.normalizer(d[self.img_key])            
+        return d
+
+class CustomRandCropByPosNegLabeld(transforms.RandCropByPosNegLabeld):
+    def __init__(self, keys, label_key, type_key, spatial_size_A, spatial_size_B, pos, neg, num_samples, image_key, image_threshold):
+        _keys = [image_key, label_key]
+        self.CT = transforms.RandCropByPosNegLabeld(_keys, label_key, spatial_size_A, pos, neg, num_samples, image_key, image_threshold)
+        self.MRI = transforms.RandCropByPosNegLabeld(_keys, label_key, spatial_size_B, pos, neg, num_samples, image_key, image_threshold)
+        self.type_key = type_key
+
+    def __call__(self, data):
+        d = dict(data)
+        if d[self.type_key] == 'CT':
+            return self.CT(data)
+        else:
+            return self.MRI(data)
+        
 def get_loader_AMOS(args):
     data_dir = args.data_dir
     datalist_json = os.path.join(data_dir, args.json_list)
     train_transform = transforms.Compose(
         [
-            transforms.LoadImaged(keys=["image_CT", "label_CT"]),
-            transforms.AddChanneld(keys=["image_CT", "label_CT"]),
-            transforms.Orientationd(keys=["image_CT", "label_CT"], axcodes="RAS"),
+            transforms.LoadImaged(keys=["image", "label"]),
+            transforms.AddChanneld(keys=["image", "label"]),
+            transforms.Orientationd(keys=["image", "label"], axcodes="RAS"),
             transforms.Spacingd(
-                keys=["image_CT", "label_CT"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+                keys=["image", "label"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
             ),
-            transforms.ScaleIntensityRanged(
-                keys=["image_CT"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+            # transforms.ScaleIntensityRanged(
+            #     keys=["image"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+            # ),
+            dynamicScaled(
+                keys=["image", "type"], img_key="image", type_key="type", a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max
             ),
-            transforms.CropForegroundd(keys=["image_CT", "label_CT"], source_key="image_CT"),
+            transforms.CropForegroundd(keys=["image", "label"], source_key="image"),
             transforms.RandCropByPosNegLabeld(
-                keys=["image_CT", "label_CT"],
-                label_key="label_CT",
-                spatial_size=(160,160,64),
+                keys=["image", "label"],
+                label_key="label",
+                spatial_size=(args.roi_x, args.roi_y, args.roi_z),
                 pos=1,
                 neg=1,
                 num_samples=4,
-                image_key="image_CT",
+                image_key="image",
                 image_threshold=0,
             ),
-            transforms.RandFlipd(keys=["image_CT", "label_CT"], prob=args.RandFlipd_prob, spatial_axis=0),
-            transforms.RandFlipd(keys=["image_CT", "label_CT"], prob=args.RandFlipd_prob, spatial_axis=1),
-            transforms.RandFlipd(keys=["image_CT", "label_CT"], prob=args.RandFlipd_prob, spatial_axis=2),
-            transforms.RandRotate90d(keys=["image_CT", "label_CT"], prob=args.RandRotate90d_prob, max_k=3),
-            transforms.RandScaleIntensityd(keys="image_CT", factors=0.1, prob=args.RandScaleIntensityd_prob),
-            transforms.RandShiftIntensityd(keys="image_CT", offsets=0.1, prob=args.RandShiftIntensityd_prob),
-            transforms.ToTensord(keys=["image_CT", "label_CT"]),
-            ######################################################################
-            transforms.LoadImaged(keys=["image_MR", "label_MR"]),
-            transforms.AddChanneld(keys=["image_MR", "label_MR"]),
-            transforms.Orientationd(keys=["image_MR", "label_MR"], axcodes="RAS"),
-            transforms.Spacingd(
-                keys=["image_MR", "label_MR"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
-            ),
-            transforms.NormalizeIntensityd(keys="image_MR"),
-            transforms.CropForegroundd(keys=["image_MR", "label_MR"], source_key="image_MR"),
-            transforms.RandCropByPosNegLabeld(
-                keys=["image_MR", "label_MR"],
-                label_key="label_MR",
-                spatial_size=(224,160,48),
-                pos=1,
-                neg=1,
-                num_samples=4,
-                image_key="image_MR",
-                image_threshold=0,
-            ),
-            transforms.RandFlipd(keys=["image_MR", "label_MR"], prob=args.RandFlipd_prob, spatial_axis=0),
-            transforms.RandFlipd(keys=["image_MR", "label_MR"], prob=args.RandFlipd_prob, spatial_axis=1),
-            transforms.RandFlipd(keys=["image_MR", "label_MR"], prob=args.RandFlipd_prob, spatial_axis=2),
-            transforms.RandRotate90d(keys=["image_MR", "label_MR"], prob=args.RandRotate90d_prob, max_k=3),
-            transforms.RandScaleIntensityd(keys="image_MR", factors=0.1, prob=args.RandScaleIntensityd_prob),
-            transforms.RandShiftIntensityd(keys="image_MR", offsets=0.1, prob=args.RandShiftIntensityd_prob),
-            transforms.ToTensord(keys=["image_MR", "label_MR"]),
+            # CustomRandCropByPosNegLabeld(
+            #     keys=["image", "label", "type"],
+            #     label_key="label",
+            #     type_key="type",
+            #     spatial_size_A=(160,160,64),
+            #     spatial_size_B=(224,160,48),
+            #     pos=1,
+            #     neg=1,
+            #     num_samples=4,
+            #     image_key="image",
+            #     image_threshold=0,
+            # ),
+            transforms.RandFlipd(keys=["image", "label"], prob=args.RandFlipd_prob, spatial_axis=0),
+            transforms.RandFlipd(keys=["image", "label"], prob=args.RandFlipd_prob, spatial_axis=1),
+            transforms.RandFlipd(keys=["image", "label"], prob=args.RandFlipd_prob, spatial_axis=2),
+            transforms.RandRotate90d(keys=["image", "label"], prob=args.RandRotate90d_prob, max_k=3),
+            transforms.RandScaleIntensityd(keys="image", factors=0.1, prob=args.RandScaleIntensityd_prob),
+            transforms.RandShiftIntensityd(keys="image", offsets=0.1, prob=args.RandShiftIntensityd_prob),
+            transforms.ToTensord(keys=["image", "label"]),             
         ]
     )
     val_transform = transforms.Compose(
         [
-            transforms.LoadImaged(keys=["image_CT", "label_CT"]),
-            transforms.AddChanneld(keys=["image_CT", "label_CT"]),
-            transforms.Orientationd(keys=["image_CT", "label_CT"], axcodes="RAS"),
+            transforms.LoadImaged(keys=["image", "label"]),
+            transforms.AddChanneld(keys=["image", "label"]),
+            transforms.Orientationd(keys=["image", "label"], axcodes="RAS"),
             transforms.Spacingd(
-                keys=["image_CT", "label_CT"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+                keys=["image", "label"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
             ),
-            transforms.ScaleIntensityRanged(
-                keys=["image_CT"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+            # transforms.ScaleIntensityRanged(
+            #     keys=["image"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+            # ),
+            dynamicProcessd(
+                keys=["image", "type"], img_key="image", type_key="type", a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max
             ),
-            transforms.CropForegroundd(keys=["image_CT", "label_CT"], source_key="image_CT"),
-            transforms.ToTensord(keys=["image_CT", "label_CT"]),
-            ######################################################################
-            transforms.LoadImaged(keys=["image_MR", "label_MR"]),
-            transforms.AddChanneld(keys=["image_MR", "label_MR"]),
-            transforms.Orientationd(keys=["image_MR", "label_MR"], axcodes="RAS"),
-            transforms.Spacingd(
-                keys=["image_MR", "label_MR"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
-            ),
-            transforms.ScaleIntensityRanged(
-                keys=["image_MR"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
-            ),
-            transforms.CropForegroundd(keys=["image_MR", "label_MR"], source_key="image_MR"),
-            transforms.ToTensord(keys=["image_MR", "label_MR"]),
+            transforms.CropForegroundd(keys=["image", "label"], source_key="image"),
+            transforms.ToTensord(keys=["image", "label"]),
         ]
     )
 
