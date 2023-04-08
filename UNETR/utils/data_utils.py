@@ -65,8 +65,13 @@ class Sampler(torch.utils.data.Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
-
 def get_loader(args):
+    if "BTCV" in args.data_dir:
+        return get_loader_BTCV(args)
+    else:
+        return get_loader_AMOS(args)
+
+def get_loader_BTCV(args):
     data_dir = args.data_dir
     datalist_json = os.path.join(data_dir, args.json_list)
     train_transform = transforms.Compose(
@@ -113,6 +118,143 @@ def get_loader(args):
             ),
             transforms.CropForegroundd(keys=["image", "label"], source_key="image"),
             transforms.ToTensord(keys=["image", "label"]),
+        ]
+    )
+
+    if args.test_mode:
+        test_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
+        test_ds = data.Dataset(data=test_files, transform=val_transform)
+        test_sampler = Sampler(test_ds, shuffle=False) if args.distributed else None
+        test_loader = data.DataLoader(
+            test_ds,
+            batch_size=1,
+            shuffle=False,
+            num_workers=args.workers,
+            sampler=test_sampler,
+            pin_memory=True,
+            persistent_workers=True,
+        )
+        loader = test_loader
+    else:
+        datalist = load_decathlon_datalist(datalist_json, True, "training", base_dir=data_dir)
+        if args.use_normal_dataset:
+            train_ds = data.Dataset(data=datalist, transform=train_transform)
+        else:
+            train_ds = data.CacheDataset(
+                data=datalist, transform=train_transform, cache_num=24, cache_rate=1.0, num_workers=args.workers
+            )
+        train_sampler = Sampler(train_ds) if args.distributed else None
+        train_loader = data.DataLoader(
+            train_ds,
+            batch_size=args.batch_size,
+            shuffle=(train_sampler is None),
+            num_workers=args.workers,
+            sampler=train_sampler,
+            pin_memory=True,
+            persistent_workers=True,
+        )
+        val_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
+        val_ds = data.Dataset(data=val_files, transform=val_transform)
+        val_sampler = Sampler(val_ds, shuffle=False) if args.distributed else None
+        val_loader = data.DataLoader(
+            val_ds,
+            batch_size=1,
+            shuffle=False,
+            num_workers=args.workers,
+            sampler=val_sampler,
+            pin_memory=True,
+            persistent_workers=True,
+        )
+        loader = [train_loader, val_loader]
+
+    return loader
+
+
+def get_loader_AMOS(args):
+    data_dir = args.data_dir
+    datalist_json = os.path.join(data_dir, args.json_list)
+    train_transform = transforms.Compose(
+        [
+            transforms.LoadImaged(keys=["image_CT", "label_CT"]),
+            transforms.AddChanneld(keys=["image_CT", "label_CT"]),
+            transforms.Orientationd(keys=["image_CT", "label_CT"], axcodes="RAS"),
+            transforms.Spacingd(
+                keys=["image_CT", "label_CT"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+            ),
+            transforms.ScaleIntensityRanged(
+                keys=["image_CT"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+            ),
+            transforms.CropForegroundd(keys=["image_CT", "label_CT"], source_key="image_CT"),
+            transforms.RandCropByPosNegLabeld(
+                keys=["image_CT", "label_CT"],
+                label_key="label_CT",
+                spatial_size=(160,160,64),
+                pos=1,
+                neg=1,
+                num_samples=4,
+                image_key="image_CT",
+                image_threshold=0,
+            ),
+            transforms.RandFlipd(keys=["image_CT", "label_CT"], prob=args.RandFlipd_prob, spatial_axis=0),
+            transforms.RandFlipd(keys=["image_CT", "label_CT"], prob=args.RandFlipd_prob, spatial_axis=1),
+            transforms.RandFlipd(keys=["image_CT", "label_CT"], prob=args.RandFlipd_prob, spatial_axis=2),
+            transforms.RandRotate90d(keys=["image_CT", "label_CT"], prob=args.RandRotate90d_prob, max_k=3),
+            transforms.RandScaleIntensityd(keys="image_CT", factors=0.1, prob=args.RandScaleIntensityd_prob),
+            transforms.RandShiftIntensityd(keys="image_CT", offsets=0.1, prob=args.RandShiftIntensityd_prob),
+            transforms.ToTensord(keys=["image_CT", "label_CT"]),
+            ######################################################################
+            transforms.LoadImaged(keys=["image_MRI", "label_MRI"]),
+            transforms.AddChanneld(keys=["image_MRI", "label_MRI"]),
+            transforms.Orientationd(keys=["image_MRI", "label_MRI"], axcodes="RAS"),
+            transforms.Spacingd(
+                keys=["image_MRI", "label_MRI"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+            ),
+            transforms.NormalizeIntensityd(keys="image_MRI"),
+            transforms.CropForegroundd(keys=["image_MRI", "label_MRI"], source_key="image_MRI"),
+            transforms.RandCropByPosNegLabeld(
+                keys=["image_MRI", "label_MRI"],
+                label_key="label_MRI",
+                spatial_size=(224,160,48),
+                pos=1,
+                neg=1,
+                num_samples=4,
+                image_key="image_MRI",
+                image_threshold=0,
+            ),
+            transforms.RandFlipd(keys=["image_MRI", "label_MRI"], prob=args.RandFlipd_prob, spatial_axis=0),
+            transforms.RandFlipd(keys=["image_MRI", "label_MRI"], prob=args.RandFlipd_prob, spatial_axis=1),
+            transforms.RandFlipd(keys=["image_MRI", "label_MRI"], prob=args.RandFlipd_prob, spatial_axis=2),
+            transforms.RandRotate90d(keys=["image_MRI", "label_MRI"], prob=args.RandRotate90d_prob, max_k=3),
+            transforms.RandScaleIntensityd(keys="image_MRI", factors=0.1, prob=args.RandScaleIntensityd_prob),
+            transforms.RandShiftIntensityd(keys="image_MRI", offsets=0.1, prob=args.RandShiftIntensityd_prob),
+            transforms.ToTensord(keys=["image_MRI", "label_MRI"]),
+        ]
+    )
+    val_transform = transforms.Compose(
+        [
+            transforms.LoadImaged(keys=["image_CT", "label_CT"]),
+            transforms.AddChanneld(keys=["image_CT", "label_CT"]),
+            transforms.Orientationd(keys=["image_CT", "label_CT"], axcodes="RAS"),
+            transforms.Spacingd(
+                keys=["image_CT", "label_CT"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+            ),
+            transforms.ScaleIntensityRanged(
+                keys=["image_CT"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+            ),
+            transforms.CropForegroundd(keys=["image_CT", "label_CT"], source_key="image_CT"),
+            transforms.ToTensord(keys=["image_CT", "label_CT"]),
+            ######################################################################
+            transforms.LoadImaged(keys=["image_MRI", "label_MRI"]),
+            transforms.AddChanneld(keys=["image_MRI", "label_MRI"]),
+            transforms.Orientationd(keys=["image_MRI", "label_MRI"], axcodes="RAS"),
+            transforms.Spacingd(
+                keys=["image_MRI", "label_MRI"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+            ),
+            transforms.ScaleIntensityRanged(
+                keys=["image_MRI"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+            ),
+            transforms.CropForegroundd(keys=["image_MRI", "label_MRI"], source_key="image_MRI"),
+            transforms.ToTensord(keys=["image_MRI", "label_MRI"]),
         ]
     )
 
