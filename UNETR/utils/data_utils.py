@@ -175,7 +175,7 @@ def get_loader_AMOS(args):
     datalist_json = os.path.join(data_dir, args.json_list)
     train_transform = transforms.Compose(
         [
-            transforms.LoadImaged(keys=["image_MRI", "label_MRI","image_CT", "label_CT"]),
+            transforms.LoadImaged(keys=["image_CT", "label_CT"]),
             transforms.AddChanneld(keys=["image_CT", "label_CT"]),
             transforms.Orientationd(keys=["image_CT", "label_CT"], axcodes="RAS"),
             transforms.Spacingd(
@@ -203,31 +203,31 @@ def get_loader_AMOS(args):
             transforms.RandShiftIntensityd(keys="image_CT", offsets=0.1, prob=args.RandShiftIntensityd_prob),
             transforms.ToTensord(keys=["image_CT", "label_CT"]),
             ######################################################################
-            # transforms.LoadImaged(keys=["image_MRI", "label_MRI"]),
-            transforms.AddChanneld(keys=["image_MRI", "label_MRI"]),
-            transforms.Orientationd(keys=["image_MRI", "label_MRI"], axcodes="RAS"),
+            transforms.LoadImaged(keys=["image_MR", "label_MR"]),
+            transforms.AddChanneld(keys=["image_MR", "label_MR"]),
+            transforms.Orientationd(keys=["image_MR", "label_MR"], axcodes="RAS"),
             transforms.Spacingd(
-                keys=["image_MRI", "label_MRI"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+                keys=["image_MR", "label_MR"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
             ),
-            transforms.NormalizeIntensityd(keys="image_MRI"),
-            transforms.CropForegroundd(keys=["image_MRI", "label_MRI"], source_key="image_MRI"),
+            transforms.NormalizeIntensityd(keys="image_MR"),
+            transforms.CropForegroundd(keys=["image_MR", "label_MR"], source_key="image_MR"),
             transforms.RandCropByPosNegLabeld(
-                keys=["image_MRI", "label_MRI"],
-                label_key="label_MRI",
+                keys=["image_MR", "label_MR"],
+                label_key="label_MR",
                 spatial_size=(224,160,48),
                 pos=1,
                 neg=1,
                 num_samples=4,
-                image_key="image_MRI",
+                image_key="image_MR",
                 image_threshold=0,
             ),
-            transforms.RandFlipd(keys=["image_MRI", "label_MRI"], prob=args.RandFlipd_prob, spatial_axis=0),
-            transforms.RandFlipd(keys=["image_MRI", "label_MRI"], prob=args.RandFlipd_prob, spatial_axis=1),
-            transforms.RandFlipd(keys=["image_MRI", "label_MRI"], prob=args.RandFlipd_prob, spatial_axis=2),
-            transforms.RandRotate90d(keys=["image_MRI", "label_MRI"], prob=args.RandRotate90d_prob, max_k=3),
-            transforms.RandScaleIntensityd(keys="image_MRI", factors=0.1, prob=args.RandScaleIntensityd_prob),
-            transforms.RandShiftIntensityd(keys="image_MRI", offsets=0.1, prob=args.RandShiftIntensityd_prob),
-            transforms.ToTensord(keys=["image_MRI", "label_MRI"]),
+            transforms.RandFlipd(keys=["image_MR", "label_MR"], prob=args.RandFlipd_prob, spatial_axis=0),
+            transforms.RandFlipd(keys=["image_MR", "label_MR"], prob=args.RandFlipd_prob, spatial_axis=1),
+            transforms.RandFlipd(keys=["image_MR", "label_MR"], prob=args.RandFlipd_prob, spatial_axis=2),
+            transforms.RandRotate90d(keys=["image_MR", "label_MR"], prob=args.RandRotate90d_prob, max_k=3),
+            transforms.RandScaleIntensityd(keys="image_MR", factors=0.1, prob=args.RandScaleIntensityd_prob),
+            transforms.RandShiftIntensityd(keys="image_MR", offsets=0.1, prob=args.RandShiftIntensityd_prob),
+            transforms.ToTensord(keys=["image_MR", "label_MR"]),
         ]
     )
     val_transform = transforms.Compose(
@@ -244,17 +244,17 @@ def get_loader_AMOS(args):
             transforms.CropForegroundd(keys=["image_CT", "label_CT"], source_key="image_CT"),
             transforms.ToTensord(keys=["image_CT", "label_CT"]),
             ######################################################################
-            transforms.LoadImaged(keys=["image_MRI", "label_MRI"]),
-            transforms.AddChanneld(keys=["image_MRI", "label_MRI"]),
-            transforms.Orientationd(keys=["image_MRI", "label_MRI"], axcodes="RAS"),
+            transforms.LoadImaged(keys=["image_MR", "label_MR"]),
+            transforms.AddChanneld(keys=["image_MR", "label_MR"]),
+            transforms.Orientationd(keys=["image_MR", "label_MR"], axcodes="RAS"),
             transforms.Spacingd(
-                keys=["image_MRI", "label_MRI"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
+                keys=["image_MR", "label_MR"], pixdim=(args.space_x, args.space_y, args.space_z), mode=("bilinear", "nearest")
             ),
             transforms.ScaleIntensityRanged(
-                keys=["image_MRI"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+                keys=["image_MR"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
             ),
-            transforms.CropForegroundd(keys=["image_MRI", "label_MRI"], source_key="image_MRI"),
-            transforms.ToTensord(keys=["image_MRI", "label_MRI"]),
+            transforms.CropForegroundd(keys=["image_MR", "label_MR"], source_key="image_MR"),
+            transforms.ToTensord(keys=["image_MR", "label_MR"]),
         ]
     )
 
