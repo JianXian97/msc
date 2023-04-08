@@ -123,6 +123,7 @@ def main_worker(gpu, args):
     torch.cuda.set_device(args.gpu)
     torch.backends.cudnn.benchmark = True
     args.test_mode = False
+    print("args.data_dir", args.data_dir)
     loader = get_loader(args)
     print(args.rank, " gpu", args.gpu)
     if args.rank == 0:

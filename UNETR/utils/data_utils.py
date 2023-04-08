@@ -66,6 +66,7 @@ class Sampler(torch.utils.data.Sampler):
         self.epoch = epoch
 
 def get_loader(args):
+    print("data_dir: ", args.data_dir)
     if "BTCV" in args.data_dir:
         return get_loader_BTCV(args)
     else:
@@ -215,8 +216,8 @@ class CustomRandCropByPosNegLabeld(transforms.RandCropByPosNegLabeld):
         
 def get_loader_AMOS(args):
     data_dir = args.data_dir
+    print("data_dir: ", data_dir)
     datalist_json = os.path.join(data_dir, args.json_list)
-    print(datalist_json)
     train_transform = transforms.Compose(
         [
             transforms.LoadImaged(keys=["image", "label"]),
