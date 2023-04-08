@@ -175,7 +175,7 @@ def get_loader_AMOS(args):
     datalist_json = os.path.join(data_dir, args.json_list)
     train_transform = transforms.Compose(
         [
-            transforms.LoadImaged(keys=["image_CT", "label_CT"]),
+            transforms.LoadImaged(keys=["image_CT", "label_CT", "image_MRI", "label_MRI"]),
             transforms.AddChanneld(keys=["image_CT", "label_CT"]),
             transforms.Orientationd(keys=["image_CT", "label_CT"], axcodes="RAS"),
             transforms.Spacingd(
@@ -203,7 +203,7 @@ def get_loader_AMOS(args):
             transforms.RandShiftIntensityd(keys="image_CT", offsets=0.1, prob=args.RandShiftIntensityd_prob),
             transforms.ToTensord(keys=["image_CT", "label_CT"]),
             ######################################################################
-            transforms.LoadImaged(keys=["image_MRI", "label_MRI"]),
+            # transforms.LoadImaged(keys=["image_MRI", "label_MRI"]),
             transforms.AddChanneld(keys=["image_MRI", "label_MRI"]),
             transforms.Orientationd(keys=["image_MRI", "label_MRI"], axcodes="RAS"),
             transforms.Spacingd(
