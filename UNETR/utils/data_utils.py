@@ -268,7 +268,7 @@ def get_loader_AMOS(args):
             # transforms.ScaleIntensityRanged(
             #     keys=["image"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
             # ),
-            dynamicProcessd(
+            dynamicScaled(
                 keys=["image", "type"], img_key="image", type_key="type", a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max
             ),
             transforms.CropForegroundd(keys=["image", "label"], source_key="image"),

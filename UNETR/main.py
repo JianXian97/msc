@@ -93,8 +93,10 @@ parser.add_argument("--smooth_dr", default=1e-6, type=float, help="constant adde
 parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added to dice numerator to avoid zero")
 
 
+
 def main():
     args = parser.parse_args()
+    args.data_dir = "../datasets/AMOS"
     args.amp = not args.noamp
     # args.logdir = "./runs/" + args.logdir
     if args.distributed:
