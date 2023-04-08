@@ -216,6 +216,7 @@ class CustomRandCropByPosNegLabeld(transforms.RandCropByPosNegLabeld):
 def get_loader_AMOS(args):
     data_dir = args.data_dir
     datalist_json = os.path.join(data_dir, args.json_list)
+    print(datalist_json)
     train_transform = transforms.Compose(
         [
             transforms.LoadImaged(keys=["image", "label"]),
