@@ -102,7 +102,7 @@ def main():
             val_inputs, val_labels = (batch["image"].cuda(), batch["label"].cuda())
             img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
             print("Inference on case {}".format(img_name))
-            val_outputs = sliding_window_inference(val_inputs, (96, 96, 96), 4, model, overlap=args.infer_overlap)
+            val_outputs = sliding_window_inference(val_inputs, (args.roi_x, args.roi_y, args.roi_z), 4, model, overlap=args.infer_overlap)
             val_outputs = torch.softmax(val_outputs, 1).cpu().numpy()
             val_outputs = np.argmax(val_outputs, axis=1).astype(np.uint8)
             val_labels = val_labels.cpu().numpy()[:, 0, :, :, :]
