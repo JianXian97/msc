@@ -32,7 +32,6 @@ class UNETMV(nn.Module):
         hidden_size: int = 768,
         mlp_dim: int = 3072,
         num_heads: int = 12,
-        pos_embed: str = "perceptron",
         norm_name: Union[Tuple, str] = "instance",
         conv_block: bool = False,
         res_block: bool = True,
@@ -47,7 +46,6 @@ class UNETMV(nn.Module):
             hidden_size: dimension of hidden layer.
             mlp_dim: dimension of feedforward layer.
             num_heads: number of attention heads.
-            pos_embed: position embedding layer type.
             norm_name: feature normalization type and arguments.
             conv_block: bool argument to determine if convolutional block is used.
             res_block: bool argument to determine if residual block is used.
@@ -59,7 +57,7 @@ class UNETMV(nn.Module):
             >>> net = UNETR(in_channels=1, out_channels=4, img_size=(96,96,96), feature_size=32, norm_name='batch')
 
             # for 4-channel input 3-channel output with patch size of (128,128,128), conv position embedding and instance norm
-            >>> net = UNETR(in_channels=4, out_channels=3, img_size=(128,128,128), pos_embed='conv', norm_name='instance')
+            >>> net = UNETR(in_channels=4, out_channels=3, img_size=(128,128,128), norm_name='instance')
 
         """
         print("Init UNETMV")
@@ -70,9 +68,7 @@ class UNETMV(nn.Module):
 
         if hidden_size % num_heads != 0:
             raise AssertionError("hidden size should be divisible by num_heads.")
-
-        if pos_embed not in ["conv", "perceptron"]:
-            raise KeyError(f"Position embedding layer of type {pos_embed} is not supported.")
+ 
 
          
         self.patch_size = (16, 16, 16)

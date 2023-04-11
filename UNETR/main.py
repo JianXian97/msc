@@ -159,7 +159,6 @@ def main_worker(gpu, args):
                 hidden_size=args.hidden_size,
                 mlp_dim=args.mlp_dim,
                 num_heads=args.num_heads,
-                pos_embed=args.pos_embed,
                 norm_name=args.norm_name,
                 conv_block=True,
                 res_block=True,
