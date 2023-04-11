@@ -20,6 +20,7 @@ import torch.multiprocessing as mp
 import torch.nn.parallel
 import torch.utils.data.distributed
 from networks.unetr import UNETR
+from networks.unetmv import UNETMV
 from optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from trainer import run_training
 from utils.data_utils import get_loader
@@ -29,6 +30,8 @@ from monai.losses import DiceCELoss, DiceLoss
 from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete, Compose
 from monai.utils.enums import MetricReduction
+
+
 
 parser = argparse.ArgumentParser(description="UNETR segmentation pipeline")
 parser.add_argument("--checkpoint", default=None, help="start training from saved checkpoint")
@@ -98,6 +101,9 @@ parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added
 def main():
     args = parser.parse_args()
     args.amp = not args.noamp
+    print("REMEMBER TO CHANGE THESE LATER!!!")
+    args.data_dir = "../datasets/AMOS"
+    args.model_name = "unetmv"
     # args.logdir = "./runs/" + args.logdir
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
@@ -128,21 +134,37 @@ def main_worker(gpu, args):
         print("Batch size is:", args.batch_size, "epochs", args.max_epochs)
     inf_size = [args.roi_x, args.roi_y, args.roi_z]
     pretrained_dir = args.pretrained_dir
-    if (args.model_name is None) or args.model_name == "unetr":
-        model = UNETR(
-            in_channels=args.in_channels,
-            out_channels=args.out_channels,
-            img_size=(args.roi_x, args.roi_y, args.roi_z),
-            feature_size=args.feature_size,
-            hidden_size=args.hidden_size,
-            mlp_dim=args.mlp_dim,
-            num_heads=args.num_heads,
-            pos_embed=args.pos_embed,
-            norm_name=args.norm_name,
-            conv_block=True,
-            res_block=True,
-            dropout_rate=args.dropout_rate,
-        )
+    if (args.model_name is None) or args.model_name == "unetr" or args.model_name == "unetmv":
+        if args.model_name == "unetr": 
+            model = UNETR(
+                in_channels=args.in_channels,
+                out_channels=args.out_channels,
+                img_size=(args.roi_x, args.roi_y, args.roi_z),
+                feature_size=args.feature_size,
+                hidden_size=args.hidden_size,
+                mlp_dim=args.mlp_dim,
+                num_heads=args.num_heads,
+                pos_embed=args.pos_embed,
+                norm_name=args.norm_name,
+                conv_block=True,
+                res_block=True,
+                dropout_rate=args.dropout_rate,
+            )
+        elif args.model_name == "unetmv":
+            model = UNETMV(
+                in_channels=args.in_channels,
+                out_channels=args.out_channels,
+                img_size=(args.roi_x, args.roi_y, args.roi_z),
+                feature_size=args.feature_size,
+                hidden_size=args.hidden_size,
+                mlp_dim=args.mlp_dim,
+                num_heads=args.num_heads,
+                pos_embed=args.pos_embed,
+                norm_name=args.norm_name,
+                conv_block=True,
+                res_block=True,
+                dropout_rate=args.dropout_rate,
+            )
 
         if args.resume_ckpt:
             model_dict = torch.load(os.path.join(pretrained_dir, args.pretrained_model_name))
