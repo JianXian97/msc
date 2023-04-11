@@ -28,6 +28,7 @@ class UNETMV(nn.Module):
         in_channels: int,
         out_channels: int,
         img_size: Tuple[int, int, int],
+        patch_size: Tuple[int, int, int] = (16,16,16),
         feature_size: int = 16,
         hidden_size: int = 768,
         mlp_dim: int = 3072,
@@ -62,16 +63,23 @@ class UNETMV(nn.Module):
         """
         print("Init UNETMV")
         super().__init__()
+        
+        self.img_size = img_size
 
         if not (0 <= dropout_rate <= 1):
             raise AssertionError("dropout_rate should be between 0 and 1.")
 
         if hidden_size % num_heads != 0:
             raise AssertionError("hidden size should be divisible by num_heads.")
- 
-
-         
-        self.patch_size = (16, 16, 16)
+            
+        for i, size in enumerate(img_size):
+            if size < patch_size[i]:
+                raise AssertionError("img size cannot be smaller than patch size for dim " + str(i))
+            
+            if patch_size[i] < 8:
+                raise AssertionError("min patch size is 8 for each dimension")
+        
+        self.patch_size = patch_size
         self.feat_size = (
             img_size[0] // self.patch_size[0],
             img_size[1] // self.patch_size[1],
@@ -151,15 +159,17 @@ class UNETMV(nn.Module):
         self.out = UnetOutBlock(spatial_dims=3, in_channels=feature_size, out_channels=out_channels)  # type: ignore
   
     def forward(self, x_in):
+        if not tuple(x_in.shape[2:]) == self.img_size:
+            raise AssertionError(f"Input shape is wrong, expected {tuple(x_in.shape[2:])}, received {self.img_size}")
         enc1 = self.mobilevit_blocks[0](x_in)
         x_in2 = self.downsample_blocks[0](enc1)
-        enc2 = self.mobilevit_blocks[0](x_in2)
-        x_in3 = self.downsample_blocks[0](enc2)
-        enc3 = self.mobilevit_blocks[0](x_in3)
-        x_in4 = self.downsample_blocks[0](enc3)
-        enc4 = self.mobilevit_blocks[0](x_in4)
+        enc2 = self.mobilevit_blocks[1](x_in2)
+        x_in3 = self.downsample_blocks[1](enc2)
+        enc3 = self.mobilevit_blocks[2](x_in3)
+        x_in4 = self.downsample_blocks[2](enc3)
+        enc4 = self.mobilevit_blocks[3](x_in4)
  
-        dec3 = self.decoder3(enc3, enc4)
+        dec3 = self.decoder3(enc4, enc3)
         dec2 = self.decoder2(dec3, enc2)
         dec1 = self.decoder1(dec2, enc1)
 

@@ -121,7 +121,7 @@ class MobileVitBlock(nn.Module):
         '''
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
         from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"b ({' '.join([c[0] for c in chars])}) ({' '.join([c[1] for c in chars])} c)"
+        to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
         axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
         unfolded = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x)
         
@@ -133,7 +133,7 @@ class MobileVitBlock(nn.Module):
         '''
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
         
-        from_chars = f"b ({' '.join([c[0] for c in chars])}) ({' '.join([c[1] for c in chars])} c)"
+        from_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
         to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
 
         axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
