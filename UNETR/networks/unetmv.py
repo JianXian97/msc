@@ -83,8 +83,8 @@ class UNETMV(nn.Module):
         )
         self.hidden_size = hidden_size
         self.classification = False
-        self.mobilevit_blocks = []
-        self.downsample_blocks = []
+        self.mobilevit_blocks = nn.ModuleList()
+        self.downsample_blocks = nn.ModuleList()
         for i in range(4):
             layer = MobileVitBlock(
                 in_channels = in_channels,

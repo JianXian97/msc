@@ -112,7 +112,6 @@ class MobileVitBlock(nn.Module):
     def unfold(self, x):
         '''
         This function is used to unfold the input image into patches.
-        asuming the input image is of shape (batch_size, channels, depth, height, width)
         '''
         '''
         b = x.shape[0] #batch size
