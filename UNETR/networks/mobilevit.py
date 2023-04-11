@@ -25,7 +25,7 @@ class MobileVitBlock(nn.Module):
         in_channels: int = 1,
         strides: Union[Sequence[int], int] = 1,
         dropout_rate: float = 0,
-        norm_name: Union[Tuple, str] = "INSTANCE",
+        norm_name: Union[Tuple, str] = "instance",
         act_name: Union[Tuple, str] = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
         #transformer params
         transformer_dim: int = 768,

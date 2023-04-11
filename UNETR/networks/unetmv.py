@@ -62,7 +62,7 @@ class UNETMV(nn.Module):
             >>> net = UNETR(in_channels=4, out_channels=3, img_size=(128,128,128), pos_embed='conv', norm_name='instance')
 
         """
-
+        print("Init UNETMV")
         super().__init__()
 
         if not (0 <= dropout_rate <= 1):
