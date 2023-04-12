@@ -15,6 +15,7 @@ import os
 import numpy as np
 import torch
 from networks.unetr import UNETR
+from networks.unetmv import UNETMV
 from trainer import dice
 from utils.data_utils import get_loader
 
@@ -54,6 +55,7 @@ parser.add_argument("--roi_z", default=96, type=int, help="roi size in z directi
 parser.add_argument("--dropout_rate", default=0.0, type=float, help="dropout rate")
 parser.add_argument("--distributed", action="store_true", help="start distributed training")
 parser.add_argument("--workers", default=8, type=int, help="number of workers")
+parser.add_argument("--model_name", default="unetr", type=str, help="model name")
 parser.add_argument("--RandFlipd_prob", default=0.2, type=float, help="RandFlipd aug probability")
 parser.add_argument("--RandRotate90d_prob", default=0.2, type=float, help="RandRotate90d aug probability")
 parser.add_argument("--RandScaleIntensityd_prob", default=0.1, type=float, help="RandScaleIntensityd aug probability")
@@ -67,27 +69,42 @@ def main():
     args.test_mode = True
     val_loader = get_loader(args)
     pretrained_dir = args.pretrained_dir
-    model_name = args.pretrained_model_name
+    pretrained_model_name = args.pretrained_model_name
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # pretrained_pth = os.path.join(pretrained_dir, model_name)
-    pretrained_pth = pretrained_dir.strip('\'') + model_name
+    # pretrained_pth = os.path.join(pretrained_dir, pretrained_model_name)
+    pretrained_pth = pretrained_dir.strip('\'') + pretrained_model_name
     if args.saved_checkpoint == "torchscript":
         model = torch.jit.load(pretrained_pth)
     elif args.saved_checkpoint == "ckpt":
-        model = UNETR(
-            in_channels=args.in_channels,
-            out_channels=args.out_channels,
-            img_size=(args.roi_x, args.roi_y, args.roi_z),
-            feature_size=args.feature_size,
-            hidden_size=args.hidden_size,
-            mlp_dim=args.mlp_dim,
-            num_heads=args.num_heads,
-            pos_embed=args.pos_embed,
-            norm_name=args.norm_name,
-            conv_block=True,
-            res_block=True,
-            dropout_rate=args.dropout_rate,
-        )
+        if args.model_name == "unetr": 
+            model = UNETR(
+                in_channels=args.in_channels,
+                out_channels=args.out_channels,
+                img_size=(args.roi_x, args.roi_y, args.roi_z),
+                feature_size=args.feature_size,
+                hidden_size=args.hidden_size,
+                mlp_dim=args.mlp_dim,
+                num_heads=args.num_heads,
+                pos_embed=args.pos_embed,
+                norm_name=args.norm_name,
+                conv_block=True,
+                res_block=True,
+                dropout_rate=args.dropout_rate,
+            )
+        elif args.model_name == "unetmv":
+            model = UNETMV(
+                in_channels=args.in_channels,
+                out_channels=args.out_channels,
+                img_size=(args.roi_x, args.roi_y, args.roi_z),
+                feature_size=args.feature_size,
+                hidden_size=args.hidden_size,
+                mlp_dim=args.mlp_dim,
+                num_heads=args.num_heads,
+                norm_name=args.norm_name,
+                conv_block=True,
+                res_block=True,
+                dropout_rate=args.dropout_rate,
+            )
         model_dict = torch.load(pretrained_pth)
         try:
             model.load_state_dict(model_dict)
