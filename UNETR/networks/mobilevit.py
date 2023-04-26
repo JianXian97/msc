@@ -28,8 +28,8 @@ class MobileVitBlock(nn.Module):
         norm_name: Union[Tuple, str] = "instance",
         act_name: Union[Tuple, str] = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
         #transformer params
-        transformer_dim: int = 768,
-        hidden_dim: int = 3072,
+        transformer_dim: int = 144,
+        hidden_dim: int = 576,
         num_heads: int = 12,
         num_layers: int = 12,
         #fold params
@@ -41,11 +41,16 @@ class MobileVitBlock(nn.Module):
     )->None :        
         super().__init__()
         self.dimensions = 3
+        self.img_size = ensure_tuple_rep(img_size, self.dimensions)
+        self.patch_size = ensure_tuple_rep(patch_size, self.dimensions)
+        self.patch_dim = in_channels * np.prod(patch_size) 
+       
         self.local_rep = nn.Sequential()
-        kernel_sizes = [3, 1]
-        paddings = [1, 0]
+        num_local_conv_layers = self.patch_size[0]//2 + 1 #stack layers to increase receptive field. +1 to account for 1x1x1 conv
+        kernel_sizes = [3] * (num_local_conv_layers - 1) + [1]
+        paddings = [1] * (num_local_conv_layers - 1) + [0]
         local_out_channels = in_channels
-        for i in range(2):
+        for i in range(num_local_conv_layers):
             conv = Convolution(
                 self.dimensions,
                 in_channels,
@@ -62,7 +67,8 @@ class MobileVitBlock(nn.Module):
                 conv_only=False,
                 padding=paddings[i],
             )
-            local_out_channels = transformer_dim
+            if i == num_local_conv_layers - 2:
+                local_out_channels = transformer_dim
             self.local_rep.add_module(f"conv{i}", conv)
         
         #project down from transformer channels to input channels using 1x1x1 conv
@@ -71,7 +77,7 @@ class MobileVitBlock(nn.Module):
                 transformer_dim,
                 in_channels,
                 strides=strides,
-                kernel_size=kernel_sizes[1],
+                kernel_size=kernel_sizes[-1],
                 adn_ordering="ADN",
                 act=act_name,
                 norm=norm_name,
@@ -80,7 +86,7 @@ class MobileVitBlock(nn.Module):
                 dilation=1,
                 bias=True,
                 conv_only=False,
-                padding=paddings[1],
+                padding=paddings[-1],
             ) 
         
         #fusion layer, combine transformer output with input patch
@@ -105,9 +111,6 @@ class MobileVitBlock(nn.Module):
             [TransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(num_layers)]
         )
 
-        self.img_size = ensure_tuple_rep(img_size, self.dimensions)
-        self.patch_size = ensure_tuple_rep(patch_size, self.dimensions)
-        self.patch_dim = in_channels * np.prod(patch_size) 
 
     def unfold(self, x):
         '''
@@ -149,8 +152,9 @@ class MobileVitBlock(nn.Module):
         x = self.conv_proj(x)
         x = torch.cat([img, x], dim=1)
         x = self.fusion_layer(x)
+
         return x
-    
+        
     def forward(self, x):
         res = x       
         out = self.local_rep(x)
