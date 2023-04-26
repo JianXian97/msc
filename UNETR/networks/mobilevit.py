@@ -157,10 +157,10 @@ class MobileVitBlock(nn.Module):
         
     def forward(self, x):
         res = x       
-        out = self.local_rep(x)
-        out = self.unfold(out)
+        x = self.local_rep(x)
+        x = self.unfold(x)
         for transformer_layer in self.transformers:
-            out = transformer_layer(out)    
-        out = self.fold(out)
-        out = self.fusion(res, out)
-        return out
+            x = transformer_layer(x)    
+        x = self.fold(x)
+        x = self.fusion(res, x)
+        return x
