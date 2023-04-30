@@ -226,6 +226,14 @@ def run_training(
                     
                     shutil.copyfile(os.path.join(args.logdir, name), os.path.join(args.logdir, "model.pt"))
 
+        #save checkpoint automatically
+        if args.rank == 0 and args.logdir is not None and args.save_checkpoint and (epoch + 1) % args.save_every == 0:
+            name = args.checkpoint_filename[:-3] + "_" + str(epoch + 1) + ".pt" 
+
+            save_checkpoint(
+                model, epoch, args, filename=name, best_acc=val_acc_max, optimizer=optimizer, scheduler=scheduler
+            )
+
         if scheduler is not None:
             scheduler.step()
 
