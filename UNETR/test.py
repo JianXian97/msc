@@ -115,6 +115,7 @@ def main():
 
     with torch.no_grad():
         dice_list_case = []
+        dice_list_case_org = []
         for i, batch in enumerate(val_loader):
             val_inputs, val_labels = (batch["image"].cuda(), batch["label"].cuda())
             img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
@@ -128,8 +129,12 @@ def main():
                 organ_Dice = dice(val_outputs[0] == i, val_labels[0] == i)
                 dice_list_sub.append(organ_Dice)
             mean_dice = np.mean(dice_list_sub)
+            dice_list_case_org.append(dice_list_sub)
+            print("Organ Dice: {}".format(["%0.2f" % i for i in dice_list_sub]))
             print("Mean Organ Dice: {}".format(mean_dice))
             dice_list_case.append(mean_dice)
+
+        print("Overall Organ Dice: {}".format(["%0.2f" % i for i in np.mean(dice_list_case_org, axis = 0)]))
         print("Overall Mean Dice: {}".format(np.mean(dice_list_case)))
 
 
