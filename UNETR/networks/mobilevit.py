@@ -114,9 +114,39 @@ class MobileVitBlock(nn.Module):
         )
         
         patch_total_size = np.prod(self.patch_size)        
-        self.unfold_proj_layer = nn.Sequential(nn.Linear(patch_total_size, transformer_dim), get_act_layer(act_name))
-        self.fold_proj_layer = nn.Sequential(nn.Linear(transformer_dim, patch_total_size), get_act_layer(act_name))
-
+        self.unfold_proj_layer = Convolution(
+                2,
+                patch_total_size,
+                transformer_dim,
+                strides=1,
+                kernel_size=1,
+                adn_ordering="ADN",
+                act=act_name,
+                norm=norm_name,
+                dropout=0,
+                dropout_dim=1,
+                dilation=1,
+                bias=True,
+                conv_only=False,
+                padding=0,
+            ) 
+        
+        self.fold_proj_layer = Convolution(
+                2,
+                transformer_dim,
+                patch_total_size,
+                strides=1,
+                kernel_size=1,
+                adn_ordering="ADN",
+                act=act_name,
+                norm=norm_name,
+                dropout=0,
+                dropout_dim=1,
+                dilation=1,
+                bias=True,
+                conv_only=False,
+                padding=0,
+            ) 
     def unfold_proj(self, x):
         '''
         This function is used to unfold the input image into patches.
@@ -129,19 +159,14 @@ class MobileVitBlock(nn.Module):
         '''
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
         from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+        to_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
         axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
         x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x)
-        
-        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)}
-        from_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        to_chars = f"(b) ({' '.join([c[0] for c in chars])}) c ({' '.join([c[1] for c in chars])})"
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x)
         x = self.unfold_proj_layer(x)
         
-        from_chars = f"(b) ({' '.join([c[0] for c in chars])}) c (z)"
-        to_chars = f"(b z) ({' '.join([c[0] for c in chars])}) c"
-        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x)
+        from_chars = "b z y c"
+        to_chars = "(b z) y c"
+        x = Rearrange(f"{from_chars} -> {to_chars}")(x)
         
         return x
     
@@ -153,17 +178,12 @@ class MobileVitBlock(nn.Module):
         axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
         num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)}
         
-        
-        from_chars = f"(b z) ({' '.join([c[0] for c in chars])}) c"
-        to_chars = f"(b) ({' '.join([c[0] for c in chars])}) c (z)"
-        x = Rearrange(f"{from_chars} -> {to_chars}", z = self.transformer_dim, **num_per_axis)(x)        
+        from_chars = "(b z) y c"
+        to_chars = "b z y c"
+        x = Rearrange(f"{from_chars} -> {to_chars}", z = self.transformer_dim)(x)        
         x = self.fold_proj_layer(x)
         
-        from_chars = f"(b) ({' '.join([c[0] for c in chars])}) c ({' '.join([c[1] for c in chars])})"
-        to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"        
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x)
-                
-        from_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+        from_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
         to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
         x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x) 
 
