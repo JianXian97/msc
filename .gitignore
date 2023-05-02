@@ -2,3 +2,4 @@ UNETR/dataset_0.json
 *.pth 
 *.pyc
 *.pyo
+UNETR/UNETMV.csv
