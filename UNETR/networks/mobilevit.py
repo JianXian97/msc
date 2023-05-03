@@ -91,13 +91,13 @@ class MobileVitBlock(nn.Module):
                 padding=paddings[-1],
             ) 
         
-        #fusion layer, combine transformer output with input patch
+        #fusion layer, combine transformer output with input patch using 1x1x1 conv
         self.fusion_layer = Convolution(
                 self.dimensions,
                 2 * in_channels,
                 out_channels,
                 strides=strides,
-                kernel_size=kernel_sizes[0],
+                kernel_size=kernel_sizes[-1],
                 adn_ordering="ADN",
                 act=act_name,
                 norm=norm_name,
@@ -106,35 +106,24 @@ class MobileVitBlock(nn.Module):
                 dilation=1,
                 bias=True,
                 conv_only=False,
-                padding=paddings[0],
+                padding=paddings[-1],
             ) 
 
         self.transformers = nn.ModuleList(
             [TransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(num_layers)]
         )
         
-        patch_total_size = np.prod(self.patch_size)        
-        self.unfold_proj_layer = Convolution(
-                2,
-                patch_total_size,
-                transformer_dim,
-                strides=1,
-                kernel_size=1,
-                adn_ordering="ADN",
-                act=act_name,
-                norm=norm_name,
-                dropout=0,
-                dropout_dim=1,
-                dilation=1,
-                bias=True,
-                conv_only=False,
-                padding=0,
-            ) 
+        self.proj_patch_size = [4, 4, 4]
         
-        self.fold_proj_layer = Convolution(
-                2,
-                transformer_dim,
-                patch_total_size,
+        patch_total_size = np.prod(self.patch_size)  
+        
+        self.unfold_proj_layer = nn.ModuleList()
+        self.fold_proj_layer = nn.ModuleList()
+        for i in range(self.dimensions):
+            axis_proj = Convolution(
+                3,
+                self.patch_size[i],
+                self.proj_patch_size[i],
                 strides=1,
                 kernel_size=1,
                 adn_ordering="ADN",
@@ -147,6 +136,25 @@ class MobileVitBlock(nn.Module):
                 conv_only=False,
                 padding=0,
             ) 
+            self.unfold_proj_layer.append(axis_proj)
+            axis_proj = Convolution(
+                3,
+                self.proj_patch_size[i],
+                self.patch_size[i],
+                strides=1,
+                kernel_size=1,
+                adn_ordering="ADN",
+                act=act_name,
+                norm=norm_name,
+                dropout=0,
+                dropout_dim=1,
+                dilation=1,
+                bias=True,
+                conv_only=False,
+                padding=0,
+            ) 
+            self.fold_proj_layer.append(axis_proj)
+            
     def unfold_proj(self, x):
         '''
         This function is used to unfold the input image into patches.
@@ -158,16 +166,24 @@ class MobileVitBlock(nn.Module):
 
         '''
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
+        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
+        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
+
+        
         from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x)
-        x = self.unfold_proj_layer(x)
-        
-        from_chars = "b z y c"
-        to_chars = "(b z) y c"
-        x = Rearrange(f"{from_chars} -> {to_chars}")(x)
-        
+        to_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)
+        x = self.unfold_proj_layer[0](x)
+        x = torch.permute(x, (0,2,1,3,4)) #b p2 p1 p3 (h w d c)
+        x = self.unfold_proj_layer[1](x) 
+        x = torch.permute(x, (0,3,2,1,4)) #b p3 p1 p2 (h w d c)
+        x = self.unfold_proj_layer[2](x) 
+        x = torch.permute(x, (0,2,3,1,4)) #b p1 p2 p3 (h w d c) 
+                
+        from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
+        to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) #(b p1 p2 p3) (h w d) c
+         
         return x
     
     def fold_proj(self, x):
@@ -175,17 +191,22 @@ class MobileVitBlock(nn.Module):
         This function is used to fold the transformer's output embeddings into the output image.
         '''
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
-        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
-        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)}
+        axes_len = {f"p{i+1}": p for i, p in enumerate(self.proj_patch_size)} #p1, p2, p3
+        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
+
+        from_chars = f"(b {' '.join([c[1] for c in chars])}) z c"
+        to_chars = f"b {' '.join([c[1] for c in chars])} (z c)"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)       
+        x = self.fold_proj_layer[0](x)
+        x = torch.permute(x, (0,2,1,3,4)) #b p2 p1 p3 (h w d c)
+        x = self.fold_proj_layer[1](x) 
+        x = torch.permute(x, (0,3,2,1,4)) #b p3 p1 p2 (h w d c)
+        x = self.fold_proj_layer[2](x) 
+        x = torch.permute(x, (0,2,3,1,4)) #b p1 p2 p3 (h w d c) 
         
-        from_chars = "(b z) y c"
-        to_chars = "b z y c"
-        x = Rearrange(f"{from_chars} -> {to_chars}", z = self.transformer_dim)(x)        
-        x = self.fold_proj_layer(x)
-        
-        from_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+        from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
         to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x) 
+        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) 
 
         return x
     
