@@ -227,6 +227,7 @@ class MobileVitBlock(nn.Module):
         torch.cuda.empty_cache()
         for transformer_layer in self.transformers:
             x = transformer_layer(x) 
+            torch.cuda.empty_cache()
         torch.cuda.empty_cache()
         x = self.fold_proj(x)
         x = self.fusion(res, x)
