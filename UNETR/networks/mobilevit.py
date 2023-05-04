@@ -218,21 +218,21 @@ class MobileVitBlock(nn.Module):
 
 
         from_chars = "(b p1 p2 p3) (h w d) c"
-        to_chars = "p1 (b p2 p3 h w d) c"
+        to_chars = "(b p1 p2 p3 w d) h c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) #axis 1
         x = self.transformers[0](x)
         
-        from_chars = "p1 (b p2 p3 h w d) c"
-        to_chars = "p2 (b p1 p3 h w d) c"
+        from_chars = "(b p1 p2 p3 w d) h c"
+        to_chars = "(b p1 p2 p3 h d) w c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) #axis 2
         x = self.transformers[1](x)
         
-        from_chars = "p2 (b p1 p3 h w d) c"
-        to_chars = "p3 (b p1 p2 h w d) c"
+        from_chars = "(b p1 p2 p3 h d) w c"
+        to_chars = "(b p1 p2 p3 h w) d c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) #axis 3
         x = self.transformers[2](x)
         
-        from_chars = "p3 (b p1 p2 h w d) c"
+        from_chars = "(b p1 p2 p3 h w) d c"
         to_chars =  "(b p1 p2 p3) (h w d) c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) 
         
