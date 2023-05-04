@@ -211,6 +211,34 @@ class MobileVitBlock(nn.Module):
 
         return x
     
+    def axial_attn(self, x):
+        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
+        axes_len = {f"p{i+1}": p for i, p in enumerate(self.proj_patch_size)} #p1, p2, p3
+        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
+
+
+        from_chars = "(b p1 p2 p3) (h w d) c"
+        to_chars = "p1 (b p2 p3 h w d) c"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) #axis 1
+        x = self.transformers[0](x)
+        
+        from_chars = "p1 (b p2 p3 h w d) c"
+        to_chars = "p2 (b p1 p3 h w d) c"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) #axis 2
+        x = self.transformers[1](x)
+        
+        from_chars = "p2 (b p1 p3 h w d) c"
+        to_chars = "p3 (b p1 p2 h w d) c"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) #axis 3
+        x = self.transformers[2](x)
+        
+        from_chars = "p3 (b p1 p2 h w d) c"
+        to_chars =  "(b p1 p2 p3) (h w d) c"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, **axes_len)(x) 
+        
+        return x
+        
+        
     def fusion(self, img, x):
         '''
         This function is used to combine the transformer output with the input patch.
@@ -226,8 +254,9 @@ class MobileVitBlock(nn.Module):
         x = self.local_rep(x)
         x = self.unfold_proj(x)
         torch.cuda.empty_cache()
-        for transformer_layer in self.transformers:
-            x = transformer_layer(x) 
+        # for transformer_layer in self.transformers:
+        #     x = transformer_layer(x) 
+        x = self.axial_attn(x)
           
         torch.cuda.empty_cache()
         x = self.fold_proj(x)
