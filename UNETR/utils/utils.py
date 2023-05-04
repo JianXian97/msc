@@ -68,3 +68,72 @@ def distributed_all_gather(
                 gather_list = [t.cpu().numpy() for t in gather_list]
             tensor_list_out.append(gather_list)
     return tensor_list_out
+
+#Analyse GPU memory usage
+def printArrayVars(scope): #used to analyse the array sizes in the GPU
+    #for debugging purposes
+    vardict = {}
+    for var in list(scope):
+        if "ndarray" in str(type(eval(var, scope))):
+            vardict[var] = str(type(eval(var,scope))), eval(var,scope).shape, eval(var,scope).nbytes, eval(var,scope).dtype.name
+
+    cache = {}
+    sta = []
+    for name in sorted(vardict.keys()):
+        if "ndarray" in vardict[name][0]:
+            var, shape, nbytes, dtype = vardict[name]
+            idv = id(var)
+            if idv in cache.keys():
+                namestr = '{} ({})'.format(name, cache[idv])
+                original = 0
+            else:
+                cache[idv] = name
+                namestr = name
+                original = 1
+            shapestr = ' x '.join(map(str, shape))
+            bytestr = str(nbytes)
+            dtype = var.split(' \'')[1].split('.')[0] + " " +  dtype
+            sta.append(
+                [namestr, shapestr, bytestr, dtype, original]
+            )
+
+
+    maxname = 0
+    maxshape = 0
+    maxbyte = 0
+    totalbytes = 0
+    for k in range(len(sta)):
+        val = sta[k]
+        if maxname < len(val[0]):
+            maxname = len(val[0])
+        if maxshape < len(val[1]):
+            maxshape = len(val[1])
+        if maxbyte < len(val[2]):
+            maxbyte = len(val[2])
+        if val[4]:
+            totalbytes += int(val[2])
+
+    if len(sta) > 0:
+        sp1 = max(10, maxname)
+        sp2 = max(10, maxshape)
+        sp3 = max(10, maxbyte)
+        prval = 'Name {} Shape {} Bytes {} Type'.format(
+            sp1 * ' ', sp2 * ' ', sp3 * ' '
+        )
+        print("{}\n{}\n".format(prval, "=" * (len(prval) + 5)))
+
+    for k in range(len(sta)):
+        val = sta[k]
+        print(
+            '{} {} {} {} {} {} {}'.format(
+                val[0],
+                ' ' * (sp1 - len(val[0]) + 4),
+                val[1],
+                ' ' * (sp2 - len(val[1]) + 5),
+                val[2],
+                ' ' * (sp3 - len(val[2]) + 5),
+                val[3],
+            )
+        )
+    print('\nUpper bound on total bytes  =       {}'.format(totalbytes))
+
