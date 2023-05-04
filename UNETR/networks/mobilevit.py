@@ -166,11 +166,12 @@ class MobileVitBlock(nn.Module):
         unfolded_x = unfolded_x.reshape(b, -1, self.patch_size[0] * self.patch_size[1] * self.patch_size[2])
 
         '''
+        
+        
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
         axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
         num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
-
-        
+ 
         from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
         to_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
         x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)
@@ -184,17 +185,25 @@ class MobileVitBlock(nn.Module):
         from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
         to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) #(b p1 p2 p3) (h w d) c
-         
+        
+        '''
+        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+        to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) 
+        '''
         return x
     
     def fold_proj(self, x):
         '''
         This function is used to fold the transformer's output embeddings into the output image.
         '''
+        
+        
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
         axes_len = {f"p{i+1}": p for i, p in enumerate(self.proj_patch_size)} #p1, p2, p3
         num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
 
+       
         from_chars = f"(b {' '.join([c[1] for c in chars])}) z c"
         to_chars = f"b {' '.join([c[1] for c in chars])} (z c)"
         x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)       
@@ -208,7 +217,17 @@ class MobileVitBlock(nn.Module):
         from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
         to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) 
+        
+        '''        
+        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
+        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
+        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
 
+        from_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+        to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) 
+        '''
+        
         return x
     
     def axial_attn(self, x):
