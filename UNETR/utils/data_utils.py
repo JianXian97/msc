@@ -66,10 +66,12 @@ class Sampler(torch.utils.data.Sampler):
         self.epoch = epoch
 
 def get_loader(args):
-    if "BTCV" in args.data_dir:
+    if "BTCV" in args.data_dir or "ACDC" in args.data_dir:
         return get_loader_BTCV(args)
-    else:
+    elif "AMOS" in args.data_dir:
         return get_loader_AMOS(args)
+    else:
+        raise ValueError("Dataset not found")
 
 def get_loader_BTCV(args):
     data_dir = args.data_dir

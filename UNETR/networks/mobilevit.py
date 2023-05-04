@@ -113,7 +113,7 @@ class MobileVitBlock(nn.Module):
             [TransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(num_layers)]
         )
         
-        self.proj_patch_size = [3, 3, 3]
+        self.proj_patch_size = [4, 4, 4]
         
         patch_total_size = np.prod(self.patch_size)  
         
