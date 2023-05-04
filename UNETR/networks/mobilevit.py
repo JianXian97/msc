@@ -12,7 +12,6 @@ from monai.networks.blocks.convolutions import Convolution
 from monai.networks.blocks.transformerblock import TransformerBlock
 from monai.networks.layers.utils import get_act_layer
 
-from utils.utils import printArrayVars
 
 torch.manual_seed(0)
 
@@ -228,13 +227,8 @@ class MobileVitBlock(nn.Module):
         x = self.unfold_proj(x)
         torch.cuda.empty_cache()
         for transformer_layer in self.transformers:
-            try:
-                x = transformer_layer(x) 
-            except MemoryError as errMsg:
-                print(errMsg)
-                print("_"*60)
-                printArrayVars(locals())
-                
+            x = transformer_layer(x) 
+          
         torch.cuda.empty_cache()
         x = self.fold_proj(x)
         x = self.fusion(res, x)
