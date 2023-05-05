@@ -45,7 +45,7 @@ class MobileVitBlock(nn.Module):
         self.dimensions = 3
         self.img_size = ensure_tuple_rep(img_size, self.dimensions)
         self.patch_size = ensure_tuple_rep(patch_size, self.dimensions)
-        self.transformer_dim = transformer_dim
+        self.transformer_dim = transformer_dim 
         # self.patch_dim = in_channels * np.prod(patch_size) 
        
         self.local_rep = nn.Sequential()
@@ -109,9 +109,12 @@ class MobileVitBlock(nn.Module):
                 conv_only=False,
                 padding=paddings[-1],
             ) 
-
+        
+        #we are using axial attention. Thus, the input dim is transformer dim * (other 2 axis dims)
+        #axis dims = Input's dim / Patch's dim
+        self.axis_dims = [i//j for i, j in zip(self.img_size, self.patch_size)]
         self.transformers = nn.ModuleList(
-            [TransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(num_layers)]
+            [TransformerBlock(int(transformer_dim * np.prod(self.axis_dims) / self.axis_dims[i]), hidden_dim, num_heads, dropout_rate) for i in range(num_layers)]
         )
         
         self.proj_patch_size = [4, 4, 4]
@@ -173,24 +176,24 @@ class MobileVitBlock(nn.Module):
              bias=True,
              conv_only=False,
              padding=0,
-         ) 
+        ) 
 
         self.fold_proj_layer = Convolution(
-                2,
-                transformer_dim,
-                patch_total_size,
-                strides=1,
-                kernel_size=1,
-                adn_ordering="ADN",
-                act=act_name,
-                norm=norm_name,
-                dropout=0,
-                dropout_dim=1,
-                dilation=1,
-                bias=True,
-                conv_only=False,
-                padding=0,
-            ) 
+            2,
+            transformer_dim,
+            patch_total_size,
+            strides=1,
+            kernel_size=1,
+            adn_ordering="ADN",
+            act=act_name,
+            norm=norm_name,
+            dropout=0,
+            dropout_dim=1,
+            dilation=1,
+            bias=True,
+            conv_only=False,
+            padding=0,
+        ) 
        
     def unfold_proj(self, x):
         '''
@@ -296,21 +299,21 @@ class MobileVitBlock(nn.Module):
 
 
         from_chars = "(b t) (h w d) c"
-        to_chars = "(b t w d) h c"
+        to_chars = "(b t) h (w d c)"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) #axis 1
         x = self.transformers[0](x)
         
-        from_chars = "(b t w d) h c"
-        to_chars = "(b t h d) w c"
+        from_chars = "(b t) h (w d c)"
+        to_chars = "(b t) w (h d c)"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) #axis 2
         x = self.transformers[1](x)
         
-        from_chars = "(b t h d) w c"
-        to_chars = "(b t h w) d c"
+        from_chars = "(b t) w (h d c)"
+        to_chars = "(b t) d (h w c)"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) #axis 3
         x = self.transformers[2](x)
         
-        from_chars = "(b t h w) d c"
+        from_chars = "(b t) d (h w c)"
         to_chars =  "(b t) (h w d) c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) 
         
