@@ -84,6 +84,9 @@ parser.add_argument("--space_z", default=2.0, type=float, help="spacing in z dir
 parser.add_argument("--roi_x", default=96, type=int, help="roi size in x direction")
 parser.add_argument("--roi_y", default=96, type=int, help="roi size in y direction")
 parser.add_argument("--roi_z", default=96, type=int, help="roi size in z direction")
+parser.add_argument("--patch_x", default=16, type=int, help="roi size in x direction")
+parser.add_argument("--patch_y", default=16, type=int, help="roi size in y direction")
+parser.add_argument("--patch_z", default=16, type=int, help="roi size in z direction")
 parser.add_argument("--dropout_rate", default=0.0, type=float, help="dropout rate")
 parser.add_argument("--RandFlipd_prob", default=0.2, type=float, help="RandFlipd aug probability")
 parser.add_argument("--RandRotate90d_prob", default=0.2, type=float, help="RandRotate90d aug probability")
@@ -156,6 +159,7 @@ def main_worker(gpu, args):
                 in_channels=args.in_channels,
                 out_channels=args.out_channels,
                 img_size=(args.roi_x, args.roi_y, args.roi_z),
+                patch_size=(args.patch_x, args.patch_y, args.patch_z),
                 feature_size=args.feature_size,
                 hidden_size=args.hidden_size,
                 mlp_dim=args.mlp_dim,
