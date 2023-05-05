@@ -49,7 +49,7 @@ class MobileVitBlock(nn.Module):
         # self.patch_dim = in_channels * np.prod(patch_size) 
        
         self.local_rep = nn.Sequential()
-        num_local_conv_layers = self.patch_size[0]//2 + 1 #stack layers to increase receptive field. +1 to account for 1x1x1 conv
+        num_local_conv_layers = max(self.patch_size)//2 + 1 #stack layers to increase receptive field. +1 to account for 1x1x1 conv
         kernel_sizes = [3] * (num_local_conv_layers - 1) + [1]
         paddings = [1] * (num_local_conv_layers - 1) + [0]
         local_out_channels = in_channels
