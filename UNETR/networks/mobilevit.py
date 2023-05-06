@@ -293,27 +293,28 @@ class MobileVitBlock(nn.Module):
         return x
     
     def axial_attn(self, x):
+        #based off https://github.com/AsukaDaisuki/MAT/blob/main/lib/models/axialnet.py#L161
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
         axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
         num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
 
 
         from_chars = "(b t) (h w d) c"
-        to_chars = "(b t) h (w d c)"
+        to_chars = "(b t w d) h c)"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) #axis 1
         x = self.transformers[0](x)
         
-        from_chars = "(b t) h (w d c)"
-        to_chars = "(b t) w (h d c)"
+        from_chars = "(b t w d) h c"
+        to_chars = "(b t h d) w c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) #axis 2
         x = self.transformers[1](x)
         
-        from_chars = "(b t) w (h d c)"
-        to_chars = "(b t) d (h w c)"
+        from_chars = "(b t h d) w c"
+        to_chars = "(b t h w) d c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) #axis 3
         x = self.transformers[2](x)
         
-        from_chars = "(b t) d (h w c)"
+        from_chars = "(b t h w) d c"
         to_chars =  "(b t) (h w d) c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) 
         
