@@ -110,11 +110,11 @@ class MobileVitBlock(nn.Module):
                 padding=paddings[-1],
             ) 
         
-        #we are using axial attention. Thus, the input dim is transformer dim * (other 2 axis dims)
+
         #axis dims = Input's dim / Patch's dim
         self.axis_dims = [i//j for i, j in zip(self.img_size, self.patch_size)]
         self.transformers = nn.ModuleList(
-            [TransformerBlock(int(transformer_dim * np.prod(self.axis_dims) / self.axis_dims[i]), hidden_dim, num_heads, dropout_rate) for i in range(num_layers)]
+            [TransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(num_layers)]
         )
         
         self.proj_patch_size = [4, 4, 4]
@@ -300,7 +300,7 @@ class MobileVitBlock(nn.Module):
 
 
         from_chars = "(b t) (h w d) c"
-        to_chars = "(b t w d) h c)"
+        to_chars = "(b t w d) h c"
         x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis, t=self.transformer_dim)(x) #axis 1
         x = self.transformers[0](x)
         
