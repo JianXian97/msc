@@ -161,16 +161,16 @@ class UNETMV(nn.Module):
         self.out = UnetOutBlock(spatial_dims=3, in_channels=feature_size, out_channels=out_channels)  # type: ignore
         
         self.gct = GCT(
-                in_channels = 16,
+                in_channels = feature_size,
                 dropout_rate = 0,
                 norm_name = "instance",      
-                transformer_dim = 24,
-                hidden_dim = 96,
-                num_heads = 12,
+                transformer_dim = hidden_size,
+                hidden_dim = mlp_dim,
+                num_heads = num_heads,
                 num_layers = 3,
-                img_size = (96, 96, 96),   
-                patch_size = (16, 16, 16),
-                out_channels = 16,        
+                img_size = img_size,   
+                patch_size = self.patch_size,
+                out_channels = feature_size,        
                 )
         
         
