@@ -89,6 +89,20 @@ class UNETMV(nn.Module):
         )
         self.hidden_size = hidden_size
         self.classification = False
+        
+        self.gct = GCT(
+                in_channels = feature_size,
+                dropout_rate = 0,
+                norm_name = "instance",      
+                transformer_dim = hidden_size,
+                hidden_dim = mlp_dim,
+                num_heads = num_heads,
+                num_layers = 3,
+                img_size = img_size,   
+                patch_size = patch_size,
+                out_channels = feature_size,        
+                )
+        
         self.mobilevit_blocks = nn.ModuleList()
         self.downsample_blocks = nn.ModuleList()
         for i in range(4):
@@ -160,18 +174,7 @@ class UNETMV(nn.Module):
         )
         self.out = UnetOutBlock(spatial_dims=3, in_channels=feature_size, out_channels=out_channels)  # type: ignore
         
-        self.gct = GCT(
-                in_channels = feature_size,
-                dropout_rate = 0,
-                norm_name = "instance",      
-                transformer_dim = hidden_size,
-                hidden_dim = mlp_dim,
-                num_heads = num_heads,
-                num_layers = 3,
-                img_size = img_size,   
-                patch_size = self.patch_size,
-                out_channels = feature_size,        
-                )
+ 
         
         
     def forward(self, x_in):
