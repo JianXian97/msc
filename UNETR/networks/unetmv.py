@@ -16,10 +16,12 @@ import torch.nn as nn
 
 from monai.networks.blocks import UnetrUpBlock
 from monai.networks.blocks.dynunet_block import UnetOutBlock
-
+from monai.networks.blocks.convolutions import Convolution
 from monai.networks.blocks.convolutions import ResidualUnit
  
 from networks.mobilevit import MobileVitBlock
+from networks.gct import GCT
+
 
 
 class UNETMV(nn.Module):
@@ -157,7 +159,21 @@ class UNETMV(nn.Module):
             res_block=res_block,
         )
         self.out = UnetOutBlock(spatial_dims=3, in_channels=feature_size, out_channels=out_channels)  # type: ignore
-  
+        
+        self.gct = GCT(
+                in_channels = 16,
+                dropout_rate = 0,
+                norm_name = "instance",      
+                transformer_dim = 24,
+                hidden_dim = 96,
+                num_heads = 12,
+                num_layers = 3,
+                img_size = (96, 96, 96),   
+                patch_size = (16, 16, 16),
+                out_channels = 16,        
+                )
+        
+        
     def forward(self, x_in):
         if not tuple(x_in.shape[2:]) == self.img_size:
             raise AssertionError(f"Input shape is wrong, expected {tuple(x_in.shape[2:])}, received {self.img_size}")
@@ -170,8 +186,11 @@ class UNETMV(nn.Module):
         enc4 = self.mobilevit_blocks[3](x_in4)
  
         dec3 = self.decoder3(enc4, enc3)
-        dec2 = self.decoder2(dec3, enc2)
-        dec1 = self.decoder1(dec2, enc1)
+        z = self.gct(enc1, enc2, dec3)
+ 
+        
+        # dec2 = self.decoder2(dec3, enc2)
+        # dec1 = self.decoder1(dec2, enc1)
 
-        out = self.out(dec1)
+        out = self.out(z)
         return out
