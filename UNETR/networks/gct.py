@@ -120,9 +120,13 @@ class GCT(MobileVitBlock):
 
         x1 = self.transformers[0](f2, f3)
         x2 = self.transformers[1](f2, f4)
-        
+        print("x1 shape___________________")
+        print(x1.shape)
+        print("x2 shape__________________")
+        print(x2.shape)
         x = torch.cat([x1, x2], dim=0)
- 
+        print("x shape__________________")
+        print(x.shape)
         x = self.combine_proj(x) 
         x = self.fold_proj(x, self.patch_size, self.fold_proj_layer)
 
