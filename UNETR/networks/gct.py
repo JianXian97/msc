@@ -110,14 +110,21 @@ class GCT(MobileVitBlock):
             ) 
 
     def forward(self, f2, f3, f4):
+        print("f2,f3,f4 shape___________________")
+        print(f2.shape, f3.shape, f4.shape)
+         
         f2 = self.local_rep[0](f2)
         f3 = self.local_rep[1](f3)
         f4 = self.local_rep[2](f4)
         
+        print("f2,f3,f4 shape___________________")
+        print(f2.shape, f3.shape, f4.shape)
         f2 = self.unfold_proj(f2, self.patch_size, self.unfold_proj_layer[0])
         f3 = self.unfold_proj(f3, (i//2 for i in self.patch_size), self.unfold_proj_layer[1])
         f4 = self.unfold_proj(f4, (i//4 for i in self.patch_size), self.unfold_proj_layer[2])
-
+        
+        print("f2,f3,f4 shape___________________")
+        print(f2.shape, f3.shape, f4.shape)
         x1 = self.transformers[0](f2, f3)
         x2 = self.transformers[1](f2, f4)
         print("x1 shape___________________")
