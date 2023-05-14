@@ -36,7 +36,7 @@ class GCT(MobileVitBlock):
         )
 
         self.combine_proj = Convolution(
-             2,
+             self.dimensions,
              2*transformer_dim,
              transformer_dim,
              strides=1,
@@ -110,32 +110,23 @@ class GCT(MobileVitBlock):
             ) 
 
     def forward(self, f2, f3, f4):
-        print("f2,f3,f4 shape___________________")
-        print(f2.shape, f3.shape, f4.shape)
-         
         f2 = self.local_rep[0](f2)
         f3 = self.local_rep[1](f3)
         f4 = self.local_rep[2](f4)
         
-        print("f2,f3,f4 shape___________________")
-        print(f2.shape, f3.shape, f4.shape)
         f2 = self.unfold_proj(f2, self.patch_size, self.unfold_proj_layer[0])
         f3 = self.unfold_proj(f3, (i//2 for i in self.patch_size), self.unfold_proj_layer[1])
         f4 = self.unfold_proj(f4, (i//4 for i in self.patch_size), self.unfold_proj_layer[2])
-        
-        print("f2,f3,f4 shape___________________")
-        print(f2.shape, f3.shape, f4.shape)
+
         x1 = self.transformers[0](f2, f3)
         x2 = self.transformers[1](f2, f4)
-        print("x1 shape___________________")
-        print(x1.shape)
-        print("x2 shape__________________")
-        print(x2.shape)
-        x = torch.cat([x1, x2], dim=0)
-        print("x shape__________________")
-        print(x.shape)
+        
+        x1 = self.fold_proj(x1, self.patch_size, self.fold_proj_layer)
+        x2 = self.fold_proj(x2, self.patch_size, self.fold_proj_layer)
+        
+        x = torch.cat([x1, x2], dim=1)
+ 
         x = self.combine_proj(x) 
-        x = self.fold_proj(x, self.patch_size, self.fold_proj_layer)
 
         return self.out(x)
 
