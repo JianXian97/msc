@@ -92,24 +92,9 @@ class GCT(MobileVitBlock):
             ) 
             self.unfold_proj_layer.append(layer)
             
-            self.out = Convolution(
-                 3,
-                 transformer_dim,
-                 out_channels,
-                 strides=1,
-                 kernel_size=1,
-                 adn_ordering="ADN",
-                 act=act_name,
-                 norm=norm_name,
-                 dropout=0,
-                 dropout_dim=1,
-                 dilation=1,
-                 bias=True,
-                 conv_only=False,
-                 padding=0,
-            ) 
-
+          
     def forward(self, f2, f3, f4):
+        res = f2
         f2 = self.local_rep[0](f2)
         f3 = self.local_rep[1](f3)
         f4 = self.local_rep[2](f4)
@@ -127,8 +112,8 @@ class GCT(MobileVitBlock):
         x = torch.cat([x1, x2], dim=1)
  
         x = self.combine_proj(x) 
-
-        return self.out(x)
+        x = self.fusion(res, x)
+        return x
 
 class CrossTransformerBlock(nn.Module):     
     def __init__(self, hidden_size: int, mlp_dim: int, num_heads: int, dropout_rate: float = 0.0) -> None:
