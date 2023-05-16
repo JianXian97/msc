@@ -103,12 +103,15 @@ class GCT(MobileVitBlock):
         f3 = self.unfold_proj(f3, (i//2 for i in self.patch_size), self.unfold_proj_layer[1])
         f4 = self.unfold_proj(f4, (i//4 for i in self.patch_size), self.unfold_proj_layer[2])
 
+        torch.cuda.empty_cache()
         x1 = self.transformers[0](f2, f3)
+        torch.cuda.empty_cache()
         x2 = self.transformers[1](f2, f4)
         
         x1 = self.fold_proj(x1, self.patch_size, self.fold_proj_layer)
         x2 = self.fold_proj(x2, self.patch_size, self.fold_proj_layer)
         
+        torch.cuda.empty_cache()
         x = torch.cat([x1, x2], dim=1)
  
         x = self.combine_proj(x) 

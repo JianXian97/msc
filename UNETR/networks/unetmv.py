@@ -22,8 +22,6 @@ from monai.networks.blocks.convolutions import ResidualUnit
 from networks.mobilevit import MobileVitBlock
 from networks.gct import GCT
 
-
-
 class UNETMV(nn.Module):
     def __init__(
         self,
@@ -91,16 +89,16 @@ class UNETMV(nn.Module):
         self.classification = False
         
         self.gct = GCT(
-                in_channels = 2*feature_size,
+                in_channels = feature_size,
                 dropout_rate = 0,
                 norm_name = "instance",      
                 transformer_dim = hidden_size,
                 hidden_dim = mlp_dim,
                 num_heads = num_heads,
                 num_layers = 3,
-                img_size = tuple(i//2 for i in img_size),   
-                patch_size = tuple(i//2 for i in patch_size),
-                out_channels = 2*feature_size,        
+                img_size = img_size,   
+                patch_size = patch_size,
+                out_channels = feature_size,        
                 )
         
         self.mobilevit_blocks = nn.ModuleList()
@@ -188,12 +186,10 @@ class UNETMV(nn.Module):
         x_in4 = self.downsample_blocks[2](enc3)
         enc4 = self.mobilevit_blocks[3](x_in4)
  
-        # dec3 = self.decoder3(enc4, enc3)
-        z = self.gct(enc2, enc3, enc4)
- 
+        dec3 = self.decoder3(enc4, enc3)       
+        dec2 = self.decoder2(dec3, enc2)
+        dec1 = self.decoder1(dec2, enc1)
         
-        # dec2 = self.decoder2(dec3, enc2)
-        dec1 = self.decoder1(z, enc1)
+        out = self.gct(dec1, dec2, dec3)
 
-        out = self.out(dec1)
-        return out
+        return self.out(out)

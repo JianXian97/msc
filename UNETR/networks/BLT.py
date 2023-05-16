@@ -13,7 +13,7 @@ from networks.mobilevit import MobileVitBlock
 
 from einops.layers.torch import Rearrange
 
-import open3d.ml.torch as ml3d
+from utils.utils import nms
 
 einops, _ = optional_import("einops")
 
@@ -70,15 +70,15 @@ class BLT(nn.Module):
         shift = np.stack((shift_x.ravel(), shift_y.ravel(), shift_z.ravel(), shift_x.ravel(), shift_y.ravel(), shift_z.ravel()), axis=1)
         M = shift.shape[0]
         window = shift.reshape(M, 6)
-        window[:, 3:] = window[:, :3] + self.patch_size - 1
+        window[:, 3:] = self.patch_size
  
-        return window
+        return torch.tensor(window)
     
     def calc_entropy(self, prob):
         #channels = num of classes, located at dim 1
         log_prob = torch.log2(prob + 1e-10)
         entropy = -1 * torch.sum(prob * log_prob, dim=1)  
-        return entropy
+        return entropy.unsqueeze(1)
     
     def forward(self, x, p_gct):
         #p_gct should be the output of the previous GCT block, channels = num of classes. 
@@ -88,15 +88,20 @@ class BLT(nn.Module):
 
         window_scores = self.calc_win_scores(entropy).view(b, -1) #b x M, M is the total number of all possible windows
 
-        # selected_patches = torch.zeros((b, self.num_windows, np.prod(self.patch_size))) #b x num_windows x prod(patch_size)
-        x_unfold = x.unfold(2,self.patch_size[0],1).unfold(3,self.patch_size[1],1).unfold(4,self.patch_size[2],1)
-        x_unfold = x_unfold.permute(0,1,3,2,4,5,6,7).reshape(b,c,-1,*self.patch_size)
+        # x_unfold = x.unfold(2,self.patch_size[0],1).unfold(3,self.patch_size[1],1).unfold(4,self.patch_size[2],1)
+        # x_unfold = x_unfold.permute(0,1,3,2,4,5,6,7).reshape(b,c,-1,*self.patch_size)
+        x1 = x.permute(0,1,3,2,4)
+        x1 = x1.unfold(3,self.patch_size[0],1).unfold(2,self.patch_size[1],1).unfold(4,self.patch_size[2],1)
+        _,_,h1,w1,d1,_,_,_ = x1.shape
+        unfold_shape = (h1, w1, d1)
+        # x1 = x1.reshape(b,c,-1,*self.patch_size)
         
         x_selected = torch.zeros((b, self.num_windows, *self.patch_size)) #b x num_windows x prod(patch_size)
 
         for i in range(b):
-            selected_windows_indices = ml3d.ops.nms(self.windows, window_scores[b,:], iou_threshold=0.2)[:,:self.num_windows] #b x num_windows, indices of the selected windows
-            x_selected = x_unfold[i, :, selected_windows_indices, :, :, :] 
+            selected_windows_indices = nms(self.windows, window_scores[i,:], iou_threshold=0.2)[:self.num_windows] #b x num_windows, indices of the selected windows
+            h, w, d = np.unravel_index(selected_windows_indices, unfold_shape)
+            x_selected = x1[i, :, selected_windows_indices, :, :, :] 
  
         from_chars = "b c (h w d) p1 p2 p3"
         to_chars = "b c (h p1) (w p2) (d p3)"
