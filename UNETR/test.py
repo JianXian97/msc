@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser(description="UNETR segmentation pipeline")
 parser.add_argument(
     "--pretrained_dir", default="./pretrained_models/", type=str, help="pretrained checkpoint directory"
 )
-parser.add_argument("--save_dir", default="./predicted/", type=str, help="directory to save the predicted segmentations")
+parser.add_argument("--save_dir", default="./predictions/", type=str, help="directory to save the predicted segmentations")
 parser.add_argument("--data_dir", default="/dataset/dataset0/", type=str, help="dataset directory")
 parser.add_argument("--json_list", default="dataset_0.json", type=str, help="dataset json file")
 parser.add_argument(
