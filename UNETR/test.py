@@ -131,7 +131,7 @@ def main():
             
             #save image predictions
              
-            nib.save(nib.Nifti1Image(val_outputs, np.eye(4)), os.path.join(args.save_dir, "pred_" + img_name))
+            nib.save(nib.Nifti1Image(val_outputs[0], np.eye(4)), os.path.join(args.save_dir, "pred_" + img_name))
 
             for i in range(1, 14):
                 organ_Dice = dice(val_outputs[0] == i, val_labels[0] == i)
