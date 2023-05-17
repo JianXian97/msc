@@ -19,6 +19,8 @@ from networks.unetmv import UNETMV
 from trainer import dice
 from utils.data_utils import get_loader
 
+import nibabel as nib
+
 from monai.inferers import sliding_window_inference
 
 parser = argparse.ArgumentParser(description="UNETR segmentation pipeline")
@@ -125,6 +127,11 @@ def main():
             val_outputs = np.argmax(val_outputs, axis=1).astype(np.uint8)
             val_labels = val_labels.cpu().numpy()[:, 0, :, :, :]
             dice_list_sub = []
+            
+            #save image predictions
+            for j in range(val_outputs.shape[0]):
+                nib.save(nib.Nifti1Image(val_outputs[j], np.eye(4)), os.path.join(args.save_dir, "pred_" + img_name + "_" + str(j) + ".nii.gz"))
+
             for i in range(1, 14):
                 organ_Dice = dice(val_outputs[0] == i, val_labels[0] == i)
                 dice_list_sub.append(organ_Dice)
