@@ -127,6 +127,7 @@ def main():
             val_outputs = torch.softmax(val_outputs, 1).cpu().numpy()
             val_outputs = np.argmax(val_outputs, axis=1).astype(np.uint8)
             val_labels = val_labels.cpu().numpy()[:, 0, :, :, :]
+            print(val_inputs.shape, val_labels.shape, val_outputs.shape)
             dice_list_sub = []
             
             #save image predictions
