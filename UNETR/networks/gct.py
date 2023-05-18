@@ -18,6 +18,7 @@ class GCT(MobileVitBlock):
         dropout_rate: float = 0,
         norm_name: Union[Tuple, str] = "instance",
         act_name: Union[Tuple, str] = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
+        local_out_channels: int = 8,
         #transformer params
         transformer_dim: int = 144,
         hidden_dim: int = 576,
@@ -52,31 +53,50 @@ class GCT(MobileVitBlock):
              padding=0,
         ) 
         
-        self.local_rep = nn.ModuleList()
-        for i in range(3):
-            conv = Convolution(
-                self.dimensions,
-                in_channels * 2**i,
-                transformer_dim,
-                strides=strides,
-                kernel_size=1,
-                adn_ordering="ADN",
-                act=act_name,
-                norm=norm_name,
-                dropout=dropout_rate,
-                dropout_dim=1,
-                dilation=1,
-                bias=True,
-                conv_only=False,
-                padding=0,
-            )            
-            self.local_rep.append(conv)
+        self.local_out_channels = local_out_channels
+        self.local_rep = nn.ModuleList([nn.Sequential(), nn.Sequential(), nn.Sequential()])
+        self.in_channels = in_channels
+        
+        num_local_conv_layers = max(max(self.patch_size)//2,1) + 1 #stack layers to increase receptive field. +1 to account for 1x1x1 conv. Min 2 layers
+        kernel_sizes = [3] * (num_local_conv_layers - 1) + [1]
+        paddings = [1] * (num_local_conv_layers - 1) + [0]
+         
+        for j in range(3):
+            #for different input feature maps with different channel size
 
+            in_channels = self.in_channels * (2**j)
+            local_out_channels = self.local_out_channels
+            
+            for i in range(num_local_conv_layers):
+                conv = Convolution(
+                    self.dimensions,
+                    in_channels,
+                    local_out_channels,
+                    strides=strides,
+                    kernel_size=kernel_sizes[i],
+                    adn_ordering="ADN",
+                    act=act_name,
+                    norm=norm_name,
+                    dropout=dropout_rate,
+                    dropout_dim=1,
+                    dilation=1,
+                    bias=True,
+                    conv_only=False,
+                    padding=paddings[i],
+                )
+                
+                in_channels = local_out_channels
+                if i == num_local_conv_layers - 2:
+                    local_out_channels = transformer_dim
+                
+                
+                self.local_rep[j].add_module(f"conv{i}", conv)
+            
         self.unfold_proj_layer = nn.ModuleList()
         for i in range(3):
             layer = Convolution(
              2,
-             np.prod(patch_size) // (8 ** i),
+             np.prod(patch_size),
              transformer_dim,
              strides=1,
              kernel_size=1,
@@ -99,19 +119,16 @@ class GCT(MobileVitBlock):
         f3 = self.local_rep[1](f3)
         f4 = self.local_rep[2](f4)
         
-        f2 = self.unfold_proj(f2, self.patch_size, self.unfold_proj_layer[0])
-        f3 = self.unfold_proj(f3, (i//2 for i in self.patch_size), self.unfold_proj_layer[1])
-        f4 = self.unfold_proj(f4, (i//4 for i in self.patch_size), self.unfold_proj_layer[2])
+        f2 = self.unfold_proj(f2, self.unfold_proj_layer[0])
+        f3 = self.unfold_proj(f3, self.unfold_proj_layer[1])
+        f4 = self.unfold_proj(f4, self.unfold_proj_layer[2])
 
-        torch.cuda.empty_cache()
         x1 = self.transformers[0](f2, f3)
-        torch.cuda.empty_cache()
         x2 = self.transformers[1](f2, f4)
         
-        x1 = self.fold_proj(x1, self.patch_size, self.fold_proj_layer)
-        x2 = self.fold_proj(x2, self.patch_size, self.fold_proj_layer)
+        x1 = self.fold_proj(x1, self.fold_proj_layer)
+        x2 = self.fold_proj(x2, self.fold_proj_layer)
         
-        torch.cuda.empty_cache()
         x = torch.cat([x1, x2], dim=1)
  
         x = self.combine_proj(x) 
@@ -138,14 +155,16 @@ class CrossTransformerBlock(nn.Module):
             raise ValueError("hidden_size should be divisible by num_heads.")
 
         self.mlp = MLPBlock(hidden_size, mlp_dim, dropout_rate)
-        self.norm1 = nn.LayerNorm(hidden_size * 2)
+        self.norm1 = nn.LayerNorm(hidden_size)
         self.attn = CABlock(hidden_size, num_heads, dropout_rate)
         self.norm2 = nn.LayerNorm(hidden_size)
 
     def forward(self, xq, xkv):
         assert len(xq) == len(xkv), "different input size!"
-        xqkv = self.norm1(torch.cat((xq, xkv), dim = 2))
-        xq, xkv = torch.chunk(xqkv, 2, dim = 2)
+        _, c1, _ = xq.shape
+        _, c2, _ = xkv.shape
+        xqkv = self.norm1(torch.cat((xq, xkv), dim = 1))
+        xq, xkv = torch.split(xqkv, [c1, c2], dim = 1)
         x = xq + self.attn(xq, xkv)
         x = x + self.mlp(self.norm2(x))
         return x

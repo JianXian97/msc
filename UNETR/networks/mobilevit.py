@@ -195,7 +195,7 @@ class MobileVitBlock(nn.Module):
             padding=0,
         ) 
        
-    def unfold_proj(self, x, patch_size, unfold_proj_layer):
+    def unfold_proj(self, x, unfold_proj_layer):
         '''
         This function is used to unfold the input image into patches.
         '''
@@ -208,7 +208,7 @@ class MobileVitBlock(nn.Module):
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
         from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
         to_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
+        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
         x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x)
         x = unfold_proj_layer(x)
         from_chars = "b z y c"
@@ -242,13 +242,13 @@ class MobileVitBlock(nn.Module):
         '''
         return x
     
-    def fold_proj(self, x, patch_size, fold_proj_layer):
+    def fold_proj(self, x, fold_proj_layer):
         '''
         This function is used to fold the transformer's output embeddings into the output image.
         '''
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
-        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
-        num_per_axis = {axis[0] : self.img_size[i]//patch_size[i] for i, axis in enumerate(chars)}
+        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
+        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)}
  
         from_chars = "(b z) y c"
         to_chars = "b z y c"
@@ -334,14 +334,14 @@ class MobileVitBlock(nn.Module):
     def forward(self, x):
         res = x       
         x = self.local_rep(x)
-        x = self.unfold_proj(x, self.patch_size, self.unfold_proj_layer)
+        x = self.unfold_proj(x, self.unfold_proj_layer)
         torch.cuda.empty_cache()
         # for transformer_layer in self.transformers:
         #     x = transformer_layer(x) 
         x = self.axial_attn(x)
           
         torch.cuda.empty_cache()
-        x = self.fold_proj(x, self.patch_size, self.fold_proj_layer)
+        x = self.fold_proj(x, self.fold_proj_layer)
         x = self.fusion(res, x)
         return x
  
