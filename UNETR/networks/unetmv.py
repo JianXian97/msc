@@ -93,7 +93,7 @@ class UNETMV(nn.Module):
                 dropout_rate = 0,
                 norm_name = "instance",      
                 transformer_dim = hidden_size,
-                local_out_channels = 16,
+                local_out_channels = 8,
                 hidden_dim = mlp_dim,
                 num_heads = num_heads,
                 num_layers = 3,
