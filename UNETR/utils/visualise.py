@@ -28,7 +28,7 @@ def padding(array, hh, ww):
     return np.pad(array, pad_width=((a, aa), (b, bb)), mode='constant')
 
 
-labels = ['background', 'spleen', 'rkid', 'lkid', 'gall', 'eso', 'liver', 'sto', 'aorta', 'IVC', 'veins', 'pancreas', 'rad', 'lad',""]
+labels = ['background', 'spleen', 'right kidney', 'left kidney', 'gallbladder', 'esophagus', 'liver', 'stomach', 'aorta', 'inferior vena cava', 'veins', 'pancreas', 'right adrenal gland', 'left adrenal gland',""]
 
 fig, ax = plt.subplots(2,5)
 
@@ -86,13 +86,13 @@ for i,j in enumerate([35,36,37,38,39]):
     ax[1,i].set_yticks([])
     
     box = ax[0,i].get_position()
-    box.x0 -= 0.1
+    box.x0 -= 0.15
     ax[0,i].set_position(box)
     box = ax[1,i].get_position()
-    box.x0 -= 0.1
+    box.x0 -= 0.15
     ax[1,i].set_position(box)
 
-ax2 = fig.add_axes([0.87, 0.1, 0.03, 0.8])
+ax2 = fig.add_axes([0.83, 0.1, 0.03, 0.8])
 
 cb = matplotlib.colorbar.ColorbarBase(ax2, cmap=cmap, norm=norm,
     spacing='proportional', ticks=bounds, boundaries=bounds, format='%1i')
