@@ -187,12 +187,12 @@ class UNETMV(nn.Module):
         x_in4 = self.downsample_blocks[2](enc3)
         enc4 = self.mobilevit_blocks[3](x_in4)
  
-        #dec3 = self.decoder3(enc4, enc3)       
-        #dec2 = self.decoder2(dec3, enc2)
+        dec3 = self.decoder3(enc4, enc3)       
+        dec2 = self.decoder2(dec3, enc2)
         
         
-        z = self.gct(enc2, enc3, enc4)
+        dec1 = self.gct(dec2, dec3, enc4)
         
-        out = self.decoder1(z, enc1)
+        out = self.decoder1(dec1, enc1)
 
         return self.out(out)

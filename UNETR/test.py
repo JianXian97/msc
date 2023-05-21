@@ -127,11 +127,12 @@ def main():
             val_outputs = torch.softmax(val_outputs, 1).cpu().numpy()
             val_outputs = np.argmax(val_outputs, axis=1).astype(np.uint8)
             val_labels = val_labels.cpu().numpy()[:, 0, :, :, :]
+            val_inputs = val_inputs.cpu().numpy()[:, 0, :, :, :]
             dice_list_sub = []
             
             #save cropped ground truth, input image and image predictions             
             nib.save(nib.Nifti1Image(val_labels[0], np.eye(4)), os.path.join(args.save_dir, "ground_" + img_name))
-            nib.save(nib.Nifti1Image(val_inputs[0,0], np.eye(4)), os.path.join(args.save_dir, "img_" + img_name))
+            nib.save(nib.Nifti1Image(val_inputs[0], np.eye(4)), os.path.join(args.save_dir, "img_" + img_name))
             nib.save(nib.Nifti1Image(val_outputs[0], np.eye(4)), os.path.join(args.save_dir, "pred_" + img_name))
 
             for i in range(1, 14):
