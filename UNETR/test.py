@@ -22,6 +22,7 @@ from utils.data_utils import get_loader
 import nibabel as nib
 
 from monai.inferers import sliding_window_inference
+from monai.metrics import compute_hausdorff_distance
 
 parser = argparse.ArgumentParser(description="UNETR segmentation pipeline")
 parser.add_argument(
@@ -119,6 +120,8 @@ def main():
     with torch.no_grad():
         dice_list_case = []
         dice_list_case_org = []
+        hd_list_case = []
+        hd_list_case_org = []
         for i, batch in enumerate(val_loader):
             val_inputs, val_labels = (batch["image"].cuda(), batch["label"].cuda())
             img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
@@ -129,23 +132,34 @@ def main():
             val_labels = val_labels.cpu().numpy()[:, 0, :, :, :]
             val_inputs = val_inputs.cpu().numpy()[:, 0, :, :, :]
             dice_list_sub = []
+            hd_list_sub = []
             
             #save cropped ground truth, input image and image predictions             
             nib.save(nib.Nifti1Image(val_labels[0], np.eye(4)), os.path.join(args.save_dir, "ground_" + img_name))
             nib.save(nib.Nifti1Image(val_inputs[0], np.eye(4)), os.path.join(args.save_dir, "img_" + img_name))
             nib.save(nib.Nifti1Image(val_outputs[0], np.eye(4)), os.path.join(args.save_dir, "pred_" + img_name))
 
-            for i in range(1, 14):
+            for i in range(1, args.out_channels):
                 organ_Dice = dice(val_outputs[0] == i, val_labels[0] == i)
+                hd = compute_hausdorff_distance(np.expand_dims(val_outputs, 0) == i, np.expand_dims(val_labels, 0) == i, percentile=95)[0][0]
                 dice_list_sub.append(organ_Dice)
+                hd_list_sub.append(hd)
+                    
             mean_dice = np.mean(dice_list_sub)
+            mean_hd = np.nanmean(hd_list_sub)
             dice_list_case_org.append(dice_list_sub)
+            hd_list_case_org.append(hd_list_sub)
             print("Organ Dice: {}".format(["%0.2f" % i for i in dice_list_sub]))
-            print("Mean Organ Dice: {}".format(mean_dice))
+            print("Mean Organ Dice: {}".format(mean_dice))            
+            print("Organ 95HD: {}".format(["%0.2f" % i for i in hd_list_sub]))
+            print("Mean 95HD: {}".format(mean_hd))
             dice_list_case.append(mean_dice)
+            hd_list_case.append(mean_hd)
 
         print("Overall Organ Dice: {}".format(["%0.2f" % i for i in np.mean(dice_list_case_org, axis = 0)]))
         print("Overall Mean Dice: {}".format(np.mean(dice_list_case)))
+        print("Overall Organ 95HD: {}".format(["%0.2f" % i for i in np.nanmean(hd_list_case_org, axis = 0)]))
+        print("Overall Mean 95HD: {}".format(np.nanmean(hd_list_case)))
 
 
 if __name__ == "__main__":
