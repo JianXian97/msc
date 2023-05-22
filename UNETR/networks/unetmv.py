@@ -76,8 +76,8 @@ class UNETMV(nn.Module):
             if size < patch_size[i]:
                 raise AssertionError("img size cannot be smaller than patch size for dim " + str(i))
             
-            if patch_size[i] < 8:
-                raise AssertionError("min patch size is 8 for each dimension")
+            if patch_size[i] < 16:
+                raise AssertionError("min patch size is 16 for each dimension")
         
         self.patch_size = patch_size
         self.feat_size = (
@@ -89,7 +89,7 @@ class UNETMV(nn.Module):
         self.classification = False
         
         self.gct = GCT(
-                in_channels = feature_size*2,
+                in_channels = feature_size*4,
                 dropout_rate = 0,
                 norm_name = "instance",      
                 transformer_dim = hidden_size,
@@ -97,14 +97,14 @@ class UNETMV(nn.Module):
                 hidden_dim = mlp_dim,
                 num_heads = num_heads,
                 num_layers = 3,
-                img_size = tuple(x // 2 for x in img_size),   
-                patch_size = (6,6,6),
-                out_channels = feature_size*2,        
+                img_size = tuple(x // 4 for x in img_size),   
+                patch_size = (3,3,3),
+                out_channels = feature_size*4,        
                 )
         
         self.mobilevit_blocks = nn.ModuleList()
         self.downsample_blocks = nn.ModuleList()
-        for i in range(4):
+        for i in range(5):
             layer = MobileVitBlock(
                 in_channels = in_channels,
                 dropout_rate = dropout_rate,
@@ -125,10 +125,10 @@ class UNETMV(nn.Module):
             self.patch_size = tuple(x // 2 for x in self.patch_size)
 
             self.mobilevit_blocks.append(layer)
-            if i == 3:
+            if i == 4:
                 break
 
-            #downsample layers, only 3 needed
+            #downsample layers, only 4 needed
             layer = ResidualUnit(
                 spatial_dims = 3,
                 in_channels = feature_size * (2 ** i),
@@ -144,6 +144,15 @@ class UNETMV(nn.Module):
 
             self.downsample_blocks.append(layer)
         
+        self.decoder4 = UnetrUpBlock(
+            spatial_dims=3,
+            in_channels=feature_size * 16,
+            out_channels=feature_size * 8,
+            kernel_size=1,
+            upsample_kernel_size=2,
+            norm_name=norm_name,
+            res_block=res_block,
+        )
         self.decoder3 = UnetrUpBlock(
             spatial_dims=3,
             in_channels=feature_size * 8,
@@ -186,13 +195,17 @@ class UNETMV(nn.Module):
         enc3 = self.mobilevit_blocks[2](x_in3)
         x_in4 = self.downsample_blocks[2](enc3)
         enc4 = self.mobilevit_blocks[3](x_in4)
- 
-        dec3 = self.decoder3(enc4, enc3)       
-        dec2 = self.decoder2(dec3, enc2)
+        x_in5 = self.downsample_blocks[3](enc4)
+        enc5 = self.mobilevit_blocks[4](x_in5)
         
         
-        dec1 = self.gct(dec2, dec3, enc4)
+        z = self.gct(enc3, enc4, enc5)
         
-        out = self.decoder1(dec1, enc1)
+        
+        # dec4 = self.decoder4(enc5, enc4)       
+        # dec3 = self.decoder3(dec4, enc3)       
+        dec2 = self.decoder2(z, enc2)       
+        
+        dec1 = self.decoder1(dec2, enc1)
 
-        return self.out(out)
+        return self.out(dec1)
