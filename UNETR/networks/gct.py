@@ -54,7 +54,7 @@ class GCT(MobileVitBlock):
         ) 
         
         self.local_out_channels = local_out_channels
-        self.local_rep = nn.ModuleList([nn.Sequential(), nn.Sequential(), nn.Sequential()])
+        self.local_rep = nn.ModuleList([nn.Sequential(), nn.Sequential(), nn.Sequential()]) #one for each input layer
         self.in_channels = in_channels
         
         num_local_conv_layers = max(max(self.patch_size)//2,1) + 1 #stack layers to increase receptive field. +1 to account for 1x1x1 conv. Min 2 layers

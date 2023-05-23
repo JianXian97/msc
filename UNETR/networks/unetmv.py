@@ -89,7 +89,7 @@ class UNETMV(nn.Module):
         self.classification = False
         
         self.gct = GCT(
-                in_channels = feature_size*4,
+                in_channels = feature_size*2,
                 dropout_rate = 0,
                 norm_name = "instance",      
                 transformer_dim = hidden_size,
@@ -97,9 +97,9 @@ class UNETMV(nn.Module):
                 hidden_dim = mlp_dim,
                 num_heads = num_heads,
                 num_layers = 3,
-                img_size = tuple(x // 4 for x in img_size),   
-                patch_size = (3,3,3),
-                out_channels = feature_size*4,        
+                img_size = tuple(x // 2 for x in img_size),   
+                patch_size = (6,6,6),
+                out_channels = feature_size*2,        
                 )
         
         self.mobilevit_blocks = nn.ModuleList()
@@ -197,15 +197,12 @@ class UNETMV(nn.Module):
         enc4 = self.mobilevit_blocks[3](x_in4)
         x_in5 = self.downsample_blocks[3](enc4)
         enc5 = self.mobilevit_blocks[4](x_in5)
+                
+        dec4 = self.decoder4(enc5, enc4)       
+        dec3 = self.decoder3(dec4, enc3)       
+        dec2 = self.decoder2(dec3, enc2)       
         
-        
-        z = self.gct(enc3, enc4, enc5)
-        
-        
-        # dec4 = self.decoder4(enc5, enc4)       
-        # dec3 = self.decoder3(dec4, enc3)       
-        dec2 = self.decoder2(z, enc2)       
-        
-        dec1 = self.decoder1(dec2, enc1)
+        z = self.gct(dec2, dec3, dec4)
+        dec1 = self.decoder1(z, enc1)
 
         return self.out(dec1)
