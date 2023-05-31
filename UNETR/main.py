@@ -188,7 +188,7 @@ def main_worker(gpu, args):
     dice_loss_func = DiceCELoss(
         to_onehot_y=True, softmax=True, squared_pred=True, smooth_nr=args.smooth_nr, smooth_dr=args.smooth_dr
     )
-    y_downsample = lambda y, scale: F.interpolate(y, scale_factor=2**(-scale), keepdim=True)
+    y_downsample = lambda y, scale: F.interpolate(y, scale_factor=2**(-scale))
     dice_loss = lambda x, y: 0.5*dice_loss_func(x[0], y) + 0.5*dice_loss_func(x[1], y_downsample(y, x[2])) #x[2] represents the scale
 
     post_label = AsDiscrete(to_onehot=True, n_classes=args.out_channels)
