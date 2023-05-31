@@ -19,6 +19,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn.parallel
 import torch.utils.data.distributed
+import torch.nn.functional as F
 from networks.unetr import UNETR
 from networks.unetmv import UNETMV
 from optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
@@ -99,6 +100,7 @@ parser.add_argument("--resume_ckpt", action="store_true", help="resume training 
 parser.add_argument("--resume_jit", action="store_true", help="resume training from pretrained torchscript checkpoint")
 parser.add_argument("--smooth_dr", default=1e-6, type=float, help="constant added to dice denominator to avoid nan")
 parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added to dice numerator to avoid zero")
+
 
 
 
@@ -183,9 +185,12 @@ def main_worker(gpu, args):
     else:
         raise ValueError("Unsupported model " + str(args.model_name))
 
-    dice_loss = DiceCELoss(
+    dice_loss_func = DiceCELoss(
         to_onehot_y=True, softmax=True, squared_pred=True, smooth_nr=args.smooth_nr, smooth_dr=args.smooth_dr
     )
+    y_downsample = lambda y, scale: F.interpolate(y, scale_factor=2**(-scale), keepdim=True)
+    dice_loss = lambda x, y: 0.5(dice_loss_func(x[0], y) + dice_loss_func(x[1], y_downsample(y, x[2]))) #x[2] represents the scale
+
     post_label = AsDiscrete(to_onehot=True, n_classes=args.out_channels)
     post_pred = AsDiscrete(argmax=True, to_onehot=True, n_classes=args.out_channels)
     dice_acc = DiceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
