@@ -90,7 +90,7 @@ class BLT(nn.Module):
 
         # x_unfold = x.unfold(2,self.patch_size[0],1).unfold(3,self.patch_size[1],1).unfold(4,self.patch_size[2],1)
         # x_unfold = x_unfold.permute(0,1,3,2,4,5,6,7).reshape(b,c,-1,*self.patch_size)
-        x1 = x.permute(0,1,3,2,4)
+        x1 = x.permute(0,1,3,2,4).contiguous()
         x1 = x1.unfold(3,self.patch_size[0],1).unfold(2,self.patch_size[1],1).unfold(4,self.patch_size[2],1)
         _,_,h1,w1,d1,_,_,_ = x1.shape
         unfold_shape = (h1, w1, d1)

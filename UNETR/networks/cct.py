@@ -128,10 +128,10 @@ class CCT(MobileVitBlock):
         f4 = self.unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3])
         
         #channel wise
-        f1 = torch.permute(f1, (0,2,1))
-        f2 = torch.permute(f2, (0,2,1))
-        f3 = torch.permute(f3, (0,2,1))
-        f4 = torch.permute(f4, (0,2,1))
+        f1 = torch.permute(f1, (0,2,1)).contiguous()
+        f2 = torch.permute(f2, (0,2,1)).contiguous()
+        f3 = torch.permute(f3, (0,2,1)).contiguous()
+        f4 = torch.permute(f4, (0,2,1)).contiguous()
 
         f5 = torch.cat([f1, f2, f3, f4], dim=1)
         
@@ -141,10 +141,10 @@ class CCT(MobileVitBlock):
         x3 = self.transformers[2](f3, f5)
         x4 = self.transformers[3](f4, f5)
         
-        x1 = torch.permute(x1, (0,2,1))
-        x2 = torch.permute(x2, (0,2,1))
-        x3 = torch.permute(x3, (0,2,1))
-        x4 = torch.permute(x4, (0,2,1))
+        x1 = torch.permute(x1, (0,2,1)).contiguous()
+        x2 = torch.permute(x2, (0,2,1)).contiguous()
+        x3 = torch.permute(x3, (0,2,1)).contiguous()
+        x4 = torch.permute(x4, (0,2,1)).contiguous()
         
         x1 = self.fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0])
         x2 = self.fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1])
