@@ -194,103 +194,7 @@ class MobileVitBlock(nn.Module):
             conv_only=False,
             padding=0,
         ) 
-       
-    def unfold_proj(self, x, patch_size, unfold_proj_layer):
-        '''
-        This function is used to unfold the input image into patches.
-        '''
-        '''
-        b = x.shape[0] #batch size
-        unfolded_x = x.unfold(2, self.patch_size[0], self.patch_size[0]).unfold(3, self.patch_size[1], self.patch_size[1]).unfold(4, self.patch_size[2], self.patch_size[2])
-        unfolded_x = unfolded_x.reshape(b, -1, self.patch_size[0] * self.patch_size[1] * self.patch_size[2])
 
-        '''
-        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
-        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x)
-        x = unfold_proj_layer(x)
-        from_chars = "b z y c"
-        to_chars = "(b z) y c"
-        x = Rearrange(f"{from_chars} -> {to_chars}")(x)
-        
-        '''
-        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
-        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
-        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
- 
-        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)
-        x = self.unfold_proj_layer[0](x)
-        x = torch.permute(x, (0,2,1,3,4)) #b p2 p1 p3 (h w d c)
-        x = self.unfold_proj_layer[1](x) 
-        x = torch.permute(x, (0,3,2,1,4)) #b p3 p1 p2 (h w d c)
-        x = self.unfold_proj_layer[2](x) 
-        x = torch.permute(x, (0,2,3,1,4)) #b p1 p2 p3 (h w d c) 
-                
-        from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
-        to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) #(b p1 p2 p3) (h w d) c
-        '''
-        
-        '''
-        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) 
-        '''
-        return x
-    
-    def fold_proj(self, x, img_size, patch_size, fold_proj_layer):
-        '''
-        This function is used to fold the transformer's output embeddings into the output image.
-        '''
-        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
-        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
-        num_per_axis = {axis[0] : img_size[i]//patch_size[i] for i, axis in enumerate(chars)}
- 
-        from_chars = "(b z) y c"
-        to_chars = "b z y c"
-        x = Rearrange(f"{from_chars} -> {to_chars}", z = self.transformer_dim)(x)        
-        x = fold_proj_layer(x)
-        
-        from_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x) 
-        
-        '''
-        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
-        axes_len = {f"p{i+1}": p for i, p in enumerate(self.proj_patch_size)} #p1, p2, p3
-        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
-
-       
-        from_chars = f"(b {' '.join([c[1] for c in chars])}) z c"
-        to_chars = f"b {' '.join([c[1] for c in chars])} (z c)"
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)       
-        x = self.fold_proj_layer[0](x)
-        x = torch.permute(x, (0,2,1,3,4)) #b p2 p1 p3 (h w d c)
-        x = self.fold_proj_layer[1](x) 
-        x = torch.permute(x, (0,3,2,1,4)) #b p3 p1 p2 (h w d c)
-        x = self.fold_proj_layer[2](x) 
-        x = torch.permute(x, (0,2,3,1,4)) #b p1 p2 p3 (h w d c) 
-        
-        from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
-        to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) 
-        '''
-        
-        '''        
-        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
-        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
-        num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
-
-        from_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
-        to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) 
-        '''
-        
-        return x
     
     def axial_attn(self, x):
         #based off https://github.com/AsukaDaisuki/MAT/blob/main/lib/models/axialnet.py#L161
@@ -334,15 +238,111 @@ class MobileVitBlock(nn.Module):
     def forward(self, x):
         res = x       
         x = self.local_rep(x)
-        x = self.unfold_proj(x, self.patch_size, self.unfold_proj_layer)
+        x = unfold_proj(x, self.patch_size, self.unfold_proj_layer)
         torch.cuda.empty_cache()
         # for transformer_layer in self.transformers:
         #     x = transformer_layer(x) 
         x = self.axial_attn(x)
           
         torch.cuda.empty_cache()
-        x = self.fold_proj(x, self.img_size, self.patch_size, self.fold_proj_layer)
+        x = fold_proj(x, self.img_size, self.patch_size, self.fold_proj_layer, self.transformer_dim)
         x = self.fusion(res, x)
         return x
  
-        
+    
+def unfold_proj(x, patch_size, unfold_proj_layer):
+    '''
+    This function is used to unfold the input image into patches.
+    '''
+    '''
+    b = x.shape[0] #batch size
+    unfolded_x = x.unfold(2, self.patch_size[0], self.patch_size[0]).unfold(3, self.patch_size[1], self.patch_size[1]).unfold(4, self.patch_size[2], self.patch_size[2])
+    unfolded_x = unfolded_x.reshape(b, -1, self.patch_size[0] * self.patch_size[1] * self.patch_size[2])
+
+    '''
+    chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))
+    from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+    to_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+    axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x)
+    x = unfold_proj_layer(x)
+    from_chars = "b z y c"
+    to_chars = "(b z) y c"
+    x = Rearrange(f"{from_chars} -> {to_chars}")(x)
+    
+    '''
+    chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
+    axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
+    num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
+ 
+    from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+    to_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)
+    x = self.unfold_proj_layer[0](x)
+    x = torch.permute(x, (0,2,1,3,4)) #b p2 p1 p3 (h w d c)
+    x = self.unfold_proj_layer[1](x) 
+    x = torch.permute(x, (0,3,2,1,4)) #b p3 p1 p2 (h w d c)
+    x = self.unfold_proj_layer[2](x) 
+    x = torch.permute(x, (0,2,3,1,4)) #b p1 p2 p3 (h w d c) 
+            
+    from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
+    to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+    x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) #(b p1 p2 p3) (h w d) c
+    '''
+    
+    '''
+    from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+    to_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) 
+    '''
+    return x
+
+def fold_proj(x, img_size, patch_size, fold_proj_layer, transformer_dim):
+    '''
+    This function is used to fold the transformer's output embeddings into the output image.
+    '''
+    chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))
+    axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
+    num_per_axis = {axis[0] : img_size[i]//patch_size[i] for i, axis in enumerate(chars)}
+ 
+    from_chars = "(b z) y c"
+    to_chars = "b z y c"
+    x = Rearrange(f"{from_chars} -> {to_chars}", z = transformer_dim)(x)        
+    x = fold_proj_layer(x)
+    
+    from_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+    to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x) 
+    
+    '''
+    chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
+    axes_len = {f"p{i+1}": p for i, p in enumerate(self.proj_patch_size)} #p1, p2, p3
+    num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
+
+   
+    from_chars = f"(b {' '.join([c[1] for c in chars])}) z c"
+    to_chars = f"b {' '.join([c[1] for c in chars])} (z c)"
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) #b p1 p2 p3 (h w d c)       
+    x = self.fold_proj_layer[0](x)
+    x = torch.permute(x, (0,2,1,3,4)) #b p2 p1 p3 (h w d c)
+    x = self.fold_proj_layer[1](x) 
+    x = torch.permute(x, (0,3,2,1,4)) #b p3 p1 p2 (h w d c)
+    x = self.fold_proj_layer[2](x) 
+    x = torch.permute(x, (0,2,3,1,4)) #b p1 p2 p3 (h w d c) 
+    
+    from_chars = f"b {' '.join([c[1] for c in chars])} ({' '.join([c[0] for c in chars])} c)"
+    to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+    x = Rearrange(f"{from_chars} -> {to_chars}", **num_per_axis)(x) 
+    '''
+    
+    '''        
+    chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
+    axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)} #p1, p2, p3
+    num_per_axis = {axis[0] : self.img_size[i]//self.patch_size[i] for i, axis in enumerate(chars)} #h, w, d
+
+    from_chars = f"(b {' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
+    to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x) 
+    '''
+    
+    return x        

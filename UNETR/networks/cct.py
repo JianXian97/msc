@@ -6,7 +6,9 @@ import numpy as np
 from typing import Sequence, Tuple, Union
 from monai.networks.blocks.mlp import MLPBlock
 from networks.crossattention import CABlock
-from networks.mobilevit import MobileVitBlock
+from networks.mobilevit import MobileVitBlock, fold_proj, unfold_proj
+from networks.gct import CrossTransformerBlock
+
 
 from monai.networks.blocks.convolutions import Convolution
 torch.manual_seed(0)
@@ -122,10 +124,10 @@ class CCT(MobileVitBlock):
     def forward(self, f1, f2, f3, f4):
         res1, res2, res3, res4 = f1, f2, f3, f4
         
-        f1 = self.unfold_proj(f1, self.patch_size, self.unfold_proj_layer[0]) 
-        f2 = self.unfold_proj(f2, self.patch_size//2, self.unfold_proj_layer[1])
-        f3 = self.unfold_proj(f3, self.patch_size//4, self.unfold_proj_layer[2])
-        f4 = self.unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3])
+        f1 = unfold_proj(f1, self.patch_size, self.unfold_proj_layer[0]) 
+        f2 = unfold_proj(f2, self.patch_size//2, self.unfold_proj_layer[1])
+        f3 = unfold_proj(f3, self.patch_size//4, self.unfold_proj_layer[2])
+        f4 = unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3])
         
         #channel wise
         f1 = torch.permute(f1, (0,2,1)).contiguous()
@@ -146,10 +148,10 @@ class CCT(MobileVitBlock):
         x3 = torch.permute(x3, (0,2,1)).contiguous()
         x4 = torch.permute(x4, (0,2,1)).contiguous()
         
-        x1 = self.fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0])
-        x2 = self.fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1])
-        x3 = self.fold_proj(x3, self.img_size//4, self.patch_size//4, self.fold_proj_layer[2])
-        x4 = self.fold_proj(x4, self.img_size//8, self.patch_size//8, self.fold_proj_layer[3])
+        x1 = fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0], self.transformer_dim)
+        x2 = fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1], self.transformer_dim)
+        x3 = fold_proj(x3, self.img_size//4, self.patch_size//4, self.fold_proj_layer[2], self.transformer_dim)
+        x4 = fold_proj(x4, self.img_size//8, self.patch_size//8, self.fold_proj_layer[3], self.transformer_dim)
         
         x1 = self.fusion_layer[0](torch.cat([res1, x1], dim=1))
         x2 = self.fusion_layer[1](torch.cat([res2, x2], dim=1))
@@ -157,37 +159,3 @@ class CCT(MobileVitBlock):
         x4 = self.fusion_layer[3](torch.cat([res4, x4], dim=1))
         
         return x1, x2, x3, x4
-
-class CrossTransformerBlock(nn.Module):     
-    def __init__(self, hidden_size: int, mlp_dim: int, num_heads: int, dropout_rate: float = 0.0) -> None:
-        """
-        Args:
-            hidden_size: dimension of hidden layer.
-            mlp_dim: dimension of feedforward layer.
-            num_heads: number of attention heads.
-            dropout_rate: faction of the input units to drop.
-
-        """
-
-        super().__init__()
-
-        if not (0 <= dropout_rate <= 1):
-            raise ValueError("dropout_rate should be between 0 and 1.")
-
-        if hidden_size % num_heads != 0:
-            raise ValueError("hidden_size should be divisible by num_heads.")
-
-        self.mlp = MLPBlock(hidden_size, mlp_dim, dropout_rate)
-        self.norm1 = nn.LayerNorm(hidden_size)
-        self.attn = CABlock(hidden_size, num_heads, dropout_rate)
-        self.norm2 = nn.LayerNorm(hidden_size)
-
-    def forward(self, xq, xkv):
-        assert len(xq) == len(xkv), "different input size!"
-        _, c1, _ = xq.shape
-        _, c2, _ = xkv.shape
-        xqkv = self.norm1(torch.cat((xq, xkv), dim = 1))
-        xq, xkv = torch.split(xqkv, [c1, c2], dim = 1)
-        x = xq + self.attn(xq, xkv)
-        x = x + self.mlp(self.norm2(x))
-        return x

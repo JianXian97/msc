@@ -22,6 +22,7 @@ from monai.networks.blocks.convolutions import ResidualUnit
 from networks.mobilevit import MobileVitBlock
 from networks.gct import GCT
 from networks.cct import CCT
+from networks.caupblock import CAUpBlock
 
 class UNETMV(nn.Module):
     def __init__(
@@ -64,7 +65,7 @@ class UNETMV(nn.Module):
         """
         print("Init UNETMV")
         super().__init__()
-        
+        self.patch_size = patch_size
         self.img_size = img_size
 
         if not (0 <= dropout_rate <= 1):
@@ -80,7 +81,7 @@ class UNETMV(nn.Module):
             if patch_size[i] < 16:
                 raise AssertionError("min patch size is 16 for each dimension")
         
-        self.patch_size = patch_size
+
         self.feat_size = (
             img_size[0] // self.patch_size[0],
             img_size[1] // self.patch_size[1],
@@ -121,6 +122,7 @@ class UNETMV(nn.Module):
         self.mobilevit_blocks = nn.ModuleList()
         self.downsample_blocks = nn.ModuleList()
         for i in range(5):
+            patch_size = tuple(x // 2**i for x in self.patch_size)
             layer = MobileVitBlock(
                 in_channels = in_channels,
                 dropout_rate = dropout_rate,
@@ -132,13 +134,12 @@ class UNETMV(nn.Module):
                 num_layers = 3,
                 #fold params
                 img_size = img_size,   
-                patch_size = self.patch_size,
+                patch_size = patch_size,
                 #mobile vit additional params
                 out_channels = feature_size * (2 ** i),        
             )
             in_channels = feature_size * (2 ** i)
             img_size = tuple(x // 2 for x in img_size)
-            self.patch_size = tuple(x // 2 for x in self.patch_size)
 
             self.mobilevit_blocks.append(layer)
             if i == 4:
@@ -160,42 +161,38 @@ class UNETMV(nn.Module):
 
             self.downsample_blocks.append(layer)
         
-        self.decoder4 = UnetrUpBlock(
-            spatial_dims=3,
-            in_channels=feature_size * 16,
-            out_channels=feature_size * 8,
-            kernel_size=1,
-            upsample_kernel_size=2,
-            norm_name=norm_name,
-            res_block=res_block,
-        )
-        self.decoder3 = UnetrUpBlock(
-            spatial_dims=3,
-            in_channels=feature_size * 8,
-            out_channels=feature_size * 4,
-            kernel_size=1,
-            upsample_kernel_size=2,
-            norm_name=norm_name,
-            res_block=res_block,
-        )
-        self.decoder2 = UnetrUpBlock(
-            spatial_dims=3,
-            in_channels=feature_size * 4,
-            out_channels=feature_size * 2,
-            kernel_size=1,
-            upsample_kernel_size=2,
-            norm_name=norm_name,
-            res_block=res_block,
-        )
-        self.decoder1 = UnetrUpBlock(
-            spatial_dims=3,
-            in_channels=feature_size * 2,
-            out_channels=feature_size,
-            kernel_size=1,
-            upsample_kernel_size=2,
-            norm_name=norm_name,
-            res_block=res_block,
-        )
+        self.decoders = nn.ModuleList()
+        # for i in range(4):
+        #     layer = UnetrUpBlock(
+        #         spatial_dims=3,
+        #         in_channels=feature_size * (2**(i+1)),
+        #         out_channels=feature_size * (2**i),
+        #         kernel_size=1,
+        #         upsample_kernel_size=2,
+        #         norm_name=norm_name,
+        #         res_block=res_block,
+        #     )
+        #     self.decoders.append(layer)
+
+        for i in range(4):
+            layer = CAUpBlock(
+                spatial_dims = 3,
+                in_channels = feature_size * (2**(i+1)),
+                out_channels = feature_size * (2**i),
+                kernel_size = 1,
+                upsample_kernel_size = 2,
+                norm_name = norm_name,
+                patch_size = tuple(x // 2**i for x in self.patch_size),
+                img_size = tuple(x // 2**i for x in self.img_size),
+                #transformer params
+                transformer_dim = hidden_size,
+                hidden_dim = mlp_dim,
+                num_heads = num_heads,
+                dropout_rate = dropout_rate,
+            )
+            self.decoders.append(layer)
+            
+ 
         self.out = UnetOutBlock(spatial_dims=3, in_channels=feature_size, out_channels=out_channels)  # type: ignore
         
  
@@ -218,10 +215,10 @@ class UNETMV(nn.Module):
         
         # z = self.gct(enc3, enc4, enc5)
         
-        dec4 = self.decoder4(enc5, enc4)       
-        dec3 = self.decoder3(dec4, enc3)              
-        dec2 = self.decoder2(dec3, enc2)
-        dec1 = self.decoder1(dec2, enc1)
+        dec4 = self.decoders[3](enc5, enc4)       
+        dec3 = self.decoders[2](dec4, enc3)              
+        dec2 = self.decoders[1](dec3, enc2)
+        dec1 = self.decoders[0](dec2, enc1)
 
         
         return self.out(dec1)

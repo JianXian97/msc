@@ -6,7 +6,7 @@ import numpy as np
 from typing import Sequence, Tuple, Union
 from monai.networks.blocks.mlp import MLPBlock
 from networks.crossattention import CABlock
-from networks.mobilevit import MobileVitBlock
+from networks.mobilevit import MobileVitBlock, fold_proj, unfold_proj
 
 from monai.networks.blocks.convolutions import Convolution
 torch.manual_seed(0)
@@ -119,15 +119,15 @@ class GCT(MobileVitBlock):
         f3 = self.local_rep[1](f3)
         f4 = self.local_rep[2](f4)
         
-        f2 = self.unfold_proj(f2, self.unfold_proj_layer[0])
-        f3 = self.unfold_proj(f3, self.unfold_proj_layer[1])
-        f4 = self.unfold_proj(f4, self.unfold_proj_layer[2])
+        f2 = unfold_proj(f2, self.patch_size, self.unfold_proj_layer[0])
+        f3 = unfold_proj(f3, self.patch_size, self.unfold_proj_layer[1])
+        f4 = unfold_proj(f4, self.patch_size, self.unfold_proj_layer[2])
 
         x1 = self.transformers[0](f2, f3)
         x2 = self.transformers[1](f2, f4)
         
-        x1 = self.fold_proj(x1, self.fold_proj_layer)
-        x2 = self.fold_proj(x2, self.fold_proj_layer)
+        x1 = fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer, self.transformer_dim)
+        x2 = fold_proj(x2, self.img_size, self.patch_size, self.fold_proj_layer, self.transformer_dim)
         
         x = torch.cat([x1, x2], dim=1)
  
