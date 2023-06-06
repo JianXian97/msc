@@ -39,8 +39,11 @@ class CCT(MobileVitBlock):
         self.img_size = np.array(self.img_size)
         
         cross_trans_dim = np.prod(self.img_size) // np.prod(self.patch_size)
-        self.transformers = nn.ModuleList(
+        self.channel_transformers = nn.ModuleList(
             [CrossTransformerBlock(cross_trans_dim, cross_trans_dim*4, num_heads, dropout_rate) for i in range(4)]
+        )
+        self.patch_transformers = nn.ModuleList(
+            [CrossTransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(4)]
         )
 
         self.combine_proj = Convolution(
@@ -61,10 +64,13 @@ class CCT(MobileVitBlock):
         ) 
         
         del self.local_rep #inherited from mobilevit
+        del self.transformers #inherited from mobilevit
         self.in_channels = in_channels
+        
         self.unfold_proj_layer = nn.ModuleList()
         self.fold_proj_layer = nn.ModuleList()
         self.fusion_layer = nn.ModuleList()
+        self.global_proj_layers = nn.ModuleList()
         for i in range(4):
             layer = Convolution(
              2,
@@ -101,6 +107,12 @@ class CCT(MobileVitBlock):
              padding=0,
             ) 
             self.fold_proj_layer.append(layer)
+                                    
+            layer1 = nn.Linear(in_channels * (2**i), transformer_dim, bias=False)
+            layer2 = nn.Linear(transformer_dim, in_channels * (2**i), bias=False)
+            self.global_proj_layers.append(layer1)
+            self.global_proj_layers.append(layer2)
+            
   
             fusion_channels = out_channels * 2**i            
             layer = Convolution(
@@ -120,33 +132,58 @@ class CCT(MobileVitBlock):
                     padding=0,
                 ) 
             self.fusion_layer.append(layer)
-          
+
+        
+        
+    def patch_attn(self, x1, x2, x3, x4):
+        x1 = self.global_proj_layers[0](x1)
+        x2 = self.global_proj_layers[2](x2)
+        x3 = self.global_proj_layers[4](x3)
+        x4 = self.global_proj_layers[6](x4)
+        x5 = torch.cat([x1, x2, x3, x4], dim=1) 
+        
+        x1 = self.patch_transformers[0](x1, x5)
+        x2 = self.patch_transformers[1](x2, x5)
+        x3 = self.patch_transformers[2](x3, x5)
+        x4 = self.patch_transformers[3](x4, x5)
+        
+        x1 = self.global_proj_layers[1](x1)
+        x2 = self.global_proj_layers[3](x2)
+        x3 = self.global_proj_layers[5](x3)
+        x4 = self.global_proj_layers[7](x4)
+        
+        return x1, x2, x3, x4
+    
+    def channel_attn(self, f1, f2, f3, f4):
+        #channel wise
+        f1 = torch.permute(f1, (0,2,1)).contiguous()
+        f2 = torch.permute(f2, (0,2,1)).contiguous()
+        f3 = torch.permute(f3, (0,2,1)).contiguous()
+        f4 = torch.permute(f4, (0,2,1)).contiguous()
+        f5 = torch.cat([f1, f2, f3, f4], dim=1)
+        
+        #channel wise cross attention
+        x1 = self.channel_transformers[0](f1, f5)
+        x2 = self.channel_transformers[1](f2, f5)
+        x3 = self.channel_transformers[2](f3, f5)
+        x4 = self.channel_transformers[3](f4, f5)
+        
+        x1 = torch.permute(x1, (0,2,1)).contiguous()
+        x2 = torch.permute(x2, (0,2,1)).contiguous()
+        x3 = torch.permute(x3, (0,2,1)).contiguous()
+        x4 = torch.permute(x4, (0,2,1)).contiguous()
+        return x1, x2, x3, x4
+        
     def forward(self, f1, f2, f3, f4):
         res1, res2, res3, res4 = f1, f2, f3, f4
         
         f1 = unfold_proj(f1, self.patch_size, self.unfold_proj_layer[0]) 
         f2 = unfold_proj(f2, self.patch_size//2, self.unfold_proj_layer[1])
         f3 = unfold_proj(f3, self.patch_size//4, self.unfold_proj_layer[2])
-        f4 = unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3])
-        
-        #channel wise
-        f1 = torch.permute(f1, (0,2,1)).contiguous()
-        f2 = torch.permute(f2, (0,2,1)).contiguous()
-        f3 = torch.permute(f3, (0,2,1)).contiguous()
-        f4 = torch.permute(f4, (0,2,1)).contiguous()
-
-        f5 = torch.cat([f1, f2, f3, f4], dim=1)
-        
-        #channel wise cross attention
-        x1 = self.transformers[0](f1, f5)
-        x2 = self.transformers[1](f2, f5)
-        x3 = self.transformers[2](f3, f5)
-        x4 = self.transformers[3](f4, f5)
-        
-        x1 = torch.permute(x1, (0,2,1)).contiguous()
-        x2 = torch.permute(x2, (0,2,1)).contiguous()
-        x3 = torch.permute(x3, (0,2,1)).contiguous()
-        x4 = torch.permute(x4, (0,2,1)).contiguous()
+        f4 = unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3])       
+            
+        x1, x2, x3, x4 = self.channel_attn(f1, f2, f3, f4)
+        x1, x2, x3, x4 = self.patch_attn(x1, x2, x3, x4)
         
         x1 = fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0], self.transformer_dim)
         x2 = fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1], self.transformer_dim)

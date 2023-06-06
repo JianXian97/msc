@@ -151,6 +151,5 @@ class CAUpBlock(nn.Module):
         out = fold_proj(out, self.img_size, self.patch_size, self.fold_proj_layer, self.transformer_dim)
         
 
-
         out = self.conv_block(out)
         return out

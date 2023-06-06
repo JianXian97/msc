@@ -90,20 +90,20 @@ class UNETMV(nn.Module):
         self.hidden_size = hidden_size
         self.classification = False
         
-        self.gct_scale = 2
-        self.gct = GCT(
-                in_channels = feature_size*(2**self.gct_scale),
-                dropout_rate = 0,
-                norm_name = "instance",      
-                transformer_dim = hidden_size,
-                local_out_channels = 8,
-                hidden_dim = mlp_dim,
-                num_heads = num_heads,
-                num_layers = 3,
-                img_size = tuple(x // 2**self.gct_scale for x in img_size),   
-                patch_size = tuple(x // 2**self.gct_scale for x in (12,12,12)),
-                out_channels = feature_size*(2**self.gct_scale),        
-                )
+        # self.gct_scale = 2
+        # self.gct = GCT(
+        #         in_channels = feature_size*(2**self.gct_scale),
+        #         dropout_rate = 0,
+        #         norm_name = "instance",      
+        #         transformer_dim = hidden_size,
+        #         local_out_channels = 8,
+        #         hidden_dim = mlp_dim,
+        #         num_heads = num_heads,
+        #         num_layers = 3,
+        #         img_size = tuple(x // 2**self.gct_scale for x in img_size),   
+        #         patch_size = tuple(x // 2**self.gct_scale for x in (12,12,12)),
+        #         out_channels = feature_size*(2**self.gct_scale),        
+        #         )
         
         self.cct_scale = 0
         self.cct = CCT(
@@ -213,11 +213,11 @@ class UNETMV(nn.Module):
                 
         enc1,enc2,enc3,enc4 = self.cct(enc1, enc2, enc3, enc4)
         
-        z = self.gct(enc3, enc4, enc5)
+        # z = self.gct(enc3, enc4, enc5)
         
-        # dec4 = self.decoders[3](enc5, enc4)       
-        # dec3 = self.decoders[2](dec4, enc3)              
-        dec2 = self.decoders[1](z, enc2)
+        dec4 = self.decoders[3](enc5, enc4)       
+        dec3 = self.decoders[2](dec4, enc3)              
+        dec2 = self.decoders[1](dec3, enc2)
         dec1 = self.decoders[0](dec2, enc1)
 
         
