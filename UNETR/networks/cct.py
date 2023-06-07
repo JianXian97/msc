@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 
 from typing import Sequence, Tuple, Union
+from monai.networks.blocks import ADN
 from monai.networks.blocks.mlp import MLPBlock
 from networks.crossattention import CABlock
 from networks.mobilevit import MobileVitBlock, fold_proj, unfold_proj
@@ -55,7 +56,7 @@ class CCT(MobileVitBlock):
              adn_ordering="ADN",
              act=act_name,
              norm=norm_name,
-             dropout=0,
+             dropout=dropout_rate,
              dropout_dim=1,
              dilation=1,
              bias=True,
@@ -81,7 +82,7 @@ class CCT(MobileVitBlock):
              adn_ordering="ADN",
              act=act_name,
              norm=norm_name,
-             dropout=0,
+             dropout=dropout_rate,
              dropout_dim=1,
              dilation=1,
              bias=True,
@@ -99,7 +100,7 @@ class CCT(MobileVitBlock):
              adn_ordering="ADN",
              act=act_name,
              norm=norm_name,
-             dropout=0,
+             dropout=dropout_rate,
              dropout_dim=1,
              dilation=1,
              bias=True,
@@ -108,8 +109,39 @@ class CCT(MobileVitBlock):
             ) 
             self.fold_proj_layer.append(layer)
                                     
-            layer1 = nn.Linear(in_channels * (2**i), transformer_dim, bias=False)
-            layer2 = nn.Linear(transformer_dim, in_channels * (2**i), bias=False)
+            layer1 = Convolution(
+                        self.dimensions,
+                        in_channels * (2**i),
+                        transformer_dim,
+                        strides=strides,
+                        kernel_size=1,
+                        adn_ordering="ADN",
+                        act=act_name,
+                        norm=norm_name,
+                        dropout=dropout_rate,
+                        dropout_dim=1,
+                        dilation=1,
+                        bias=True,
+                        conv_only=False,
+                        padding=0,
+                    ) 
+            layer2 = Convolution(
+                        self.dimensions,
+                        transformer_dim,
+                        in_channels * (2**i),
+                        strides=strides,
+                        kernel_size=1,
+                        adn_ordering="ADN",
+                        act=act_name,
+                        norm=norm_name,
+                        dropout=dropout_rate,
+                        dropout_dim=1,
+                        dilation=1,
+                        bias=True,
+                        conv_only=False,
+                        padding=0,
+                    ) 
+            
             self.global_proj_layers.append(layer1)
             self.global_proj_layers.append(layer2)
             
@@ -135,17 +167,27 @@ class CCT(MobileVitBlock):
 
         
         
-    def patch_attn(self, x1, x2, x3, x4):
-        x1 = self.global_proj_layers[0](x1)
-        x2 = self.global_proj_layers[2](x2)
-        x3 = self.global_proj_layers[4](x3)
-        x4 = self.global_proj_layers[6](x4)
-        x5 = torch.cat([x1, x2, x3, x4], dim=1) 
+    def patch_attn(self, f1, f2, f3, f4):
+        f1 = self.global_proj_layers[0](f1)
+        f2 = self.global_proj_layers[2](f2)
+        f3 = self.global_proj_layers[4](f3)
+        f4 = self.global_proj_layers[6](f4)
         
-        x1 = self.patch_transformers[0](x1, x5)
-        x2 = self.patch_transformers[1](x2, x5)
-        x3 = self.patch_transformers[2](x3, x5)
-        x4 = self.patch_transformers[3](x4, x5)
+        f1 = unfold_proj(f1, self.patch_size, self.unfold_proj_layer[0]) 
+        f2 = unfold_proj(f2, self.patch_size//2, self.unfold_proj_layer[1])
+        f3 = unfold_proj(f3, self.patch_size//4, self.unfold_proj_layer[2])
+        f4 = unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3]) 
+        f5 = torch.cat([f1, f2, f3, f4], dim=1) 
+        
+        x1 = self.patch_transformers[0](f1, f5)
+        x2 = self.patch_transformers[1](f2, f5)
+        x3 = self.patch_transformers[2](f3, f5)
+        x4 = self.patch_transformers[3](f4, f5)
+        
+        x1 = fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0], self.transformer_dim)
+        x2 = fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1], self.transformer_dim)
+        x3 = fold_proj(x3, self.img_size//4, self.patch_size//4, self.fold_proj_layer[2], self.transformer_dim)
+        x4 = fold_proj(x4, self.img_size//8, self.patch_size//8, self.fold_proj_layer[3], self.transformer_dim)
         
         x1 = self.global_proj_layers[1](x1)
         x2 = self.global_proj_layers[3](x2)
@@ -154,7 +196,12 @@ class CCT(MobileVitBlock):
         
         return x1, x2, x3, x4
     
-    def channel_attn(self, f1, f2, f3, f4):
+    def channel_attn(self, f1, f2, f3, f4):                
+        f1 = unfold_proj(f1, self.patch_size, self.unfold_proj_layer[0]) 
+        f2 = unfold_proj(f2, self.patch_size//2, self.unfold_proj_layer[1])
+        f3 = unfold_proj(f3, self.patch_size//4, self.unfold_proj_layer[2])
+        f4 = unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3])  
+        
         #channel wise
         f1 = torch.permute(f1, (0,2,1)).contiguous()
         f2 = torch.permute(f2, (0,2,1)).contiguous()
@@ -172,24 +219,20 @@ class CCT(MobileVitBlock):
         x2 = torch.permute(x2, (0,2,1)).contiguous()
         x3 = torch.permute(x3, (0,2,1)).contiguous()
         x4 = torch.permute(x4, (0,2,1)).contiguous()
-        return x1, x2, x3, x4
-        
-    def forward(self, f1, f2, f3, f4):
-        res1, res2, res3, res4 = f1, f2, f3, f4
-        
-        f1 = unfold_proj(f1, self.patch_size, self.unfold_proj_layer[0]) 
-        f2 = unfold_proj(f2, self.patch_size//2, self.unfold_proj_layer[1])
-        f3 = unfold_proj(f3, self.patch_size//4, self.unfold_proj_layer[2])
-        f4 = unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3])       
-            
-        x1, x2, x3, x4 = self.channel_attn(f1, f2, f3, f4)
-        x1, x2, x3, x4 = self.patch_attn(x1, x2, x3, x4)
         
         x1 = fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0], self.transformer_dim)
         x2 = fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1], self.transformer_dim)
         x3 = fold_proj(x3, self.img_size//4, self.patch_size//4, self.fold_proj_layer[2], self.transformer_dim)
         x4 = fold_proj(x4, self.img_size//8, self.patch_size//8, self.fold_proj_layer[3], self.transformer_dim)
         
+        return x1, x2, x3, x4
+        
+    def forward(self, f1, f2, f3, f4):
+        res1, res2, res3, res4 = f1, f2, f3, f4
+        x1, x2, x3, x4 = self.channel_attn(f1, f2, f3, f4)
+        x1, x2, x3, x4 = self.patch_attn(x1, x2, x3, x4)
+        
+
         x1 = self.fusion_layer[0](torch.cat([res1, x1], dim=1))
         x2 = self.fusion_layer[1](torch.cat([res2, x2], dim=1))
         x3 = self.fusion_layer[2](torch.cat([res3, x3], dim=1))
