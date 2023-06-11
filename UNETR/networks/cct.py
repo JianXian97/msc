@@ -210,32 +210,32 @@ class CCT(MobileVitBlock):
         f5 = torch.cat([f1, f2, f3, f4], dim=1)
         
         #channel wise cross attention
-        x1 = self.channel_transformers[0](f1, f5)
-        x2 = self.channel_transformers[1](f2, f5)
-        x3 = self.channel_transformers[2](f3, f5)
-        x4 = self.channel_transformers[3](f4, f5)
+        f1 = self.channel_transformers[0](f1, f5)
+        f2 = self.channel_transformers[1](f2, f5)
+        f3 = self.channel_transformers[2](f3, f5)
+        f4 = self.channel_transformers[3](f4, f5)
         
-        x1 = torch.permute(x1, (0,2,1)).contiguous()
-        x2 = torch.permute(x2, (0,2,1)).contiguous()
-        x3 = torch.permute(x3, (0,2,1)).contiguous()
-        x4 = torch.permute(x4, (0,2,1)).contiguous()
+        f1 = torch.permute(f1, (0,2,1)).contiguous()
+        f2 = torch.permute(f2, (0,2,1)).contiguous()
+        f3 = torch.permute(f3, (0,2,1)).contiguous()
+        f4 = torch.permute(f4, (0,2,1)).contiguous()
         
-        x1 = fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0], self.transformer_dim)
-        x2 = fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1], self.transformer_dim)
-        x3 = fold_proj(x3, self.img_size//4, self.patch_size//4, self.fold_proj_layer[2], self.transformer_dim)
-        x4 = fold_proj(x4, self.img_size//8, self.patch_size//8, self.fold_proj_layer[3], self.transformer_dim)
+        f1 = fold_proj(f1, self.img_size, self.patch_size, self.fold_proj_layer[0], self.transformer_dim)
+        f2 = fold_proj(f2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1], self.transformer_dim)
+        f3 = fold_proj(f3, self.img_size//4, self.patch_size//4, self.fold_proj_layer[2], self.transformer_dim)
+        f4 = fold_proj(f4, self.img_size//8, self.patch_size//8, self.fold_proj_layer[3], self.transformer_dim)
         
-        return x1, x2, x3, x4
+        return f1, f2, f3, f4
         
     def forward(self, f1, f2, f3, f4):
         res1, res2, res3, res4 = f1, f2, f3, f4
-        x1, x2, x3, x4 = self.channel_attn(f1, f2, f3, f4)
-        x1, x2, x3, x4 = self.patch_attn(x1, x2, x3, x4)
+        f1, f2, f3, f4 = self.channel_attn(f1, f2, f3, f4)
+        f1, f2, f3, f4 = self.patch_attn(f1, f2, f3, f4)
         
 
-        x1 = self.fusion_layer[0](torch.cat([res1, x1], dim=1))
-        x2 = self.fusion_layer[1](torch.cat([res2, x2], dim=1))
-        x3 = self.fusion_layer[2](torch.cat([res3, x3], dim=1))
-        x4 = self.fusion_layer[3](torch.cat([res4, x4], dim=1))
+        x1 = self.fusion_layer[0](torch.cat([res1, f1], dim=1))
+        x2 = self.fusion_layer[1](torch.cat([res2, f2], dim=1))
+        x3 = self.fusion_layer[2](torch.cat([res3, f3], dim=1))
+        x4 = self.fusion_layer[3](torch.cat([res4, f4], dim=1))
         
         return x1, x2, x3, x4
