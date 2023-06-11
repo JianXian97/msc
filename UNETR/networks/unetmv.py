@@ -162,35 +162,35 @@ class UNETMV(nn.Module):
             self.downsample_blocks.append(layer)
         
         self.decoders = nn.ModuleList()
-        # for i in range(4):
-        #     layer = UnetrUpBlock(
-        #         spatial_dims=3,
-        #         in_channels=feature_size * (2**(i+1)),
-        #         out_channels=feature_size * (2**i),
-        #         kernel_size=1,
-        #         upsample_kernel_size=2,
-        #         norm_name=norm_name,
-        #         res_block=res_block,
-        #     )
-        #     self.decoders.append(layer)
-
         for i in range(4):
-            layer = CAUpBlock(
-                spatial_dims = 3,
-                in_channels = feature_size * (2**(i+1)),
-                out_channels = feature_size * (2**i),
-                kernel_size = 1,
-                upsample_kernel_size = 2,
-                norm_name = norm_name,
-                patch_size = tuple(x // 2**i for x in self.patch_size),
-                img_size = tuple(x // 2**i for x in self.img_size),
-                #transformer params
-                transformer_dim = hidden_size,
-                hidden_dim = mlp_dim,
-                num_heads = num_heads,
-                dropout_rate = dropout_rate,
+            layer = UnetrUpBlock(
+                spatial_dims=3,
+                in_channels=feature_size * (2**(i+1)),
+                out_channels=feature_size * (2**i),
+                kernel_size=1,
+                upsample_kernel_size=2,
+                norm_name=norm_name,
+                res_block=res_block,
             )
             self.decoders.append(layer)
+
+        # for i in range(4):
+        #     layer = CAUpBlock(
+        #         spatial_dims = 3,
+        #         in_channels = feature_size * (2**(i+1)),
+        #         out_channels = feature_size * (2**i),
+        #         kernel_size = 1,
+        #         upsample_kernel_size = 2,
+        #         norm_name = norm_name,
+        #         patch_size = tuple(x // 2**i for x in self.patch_size),
+        #         img_size = tuple(x // 2**i for x in self.img_size),
+        #         #transformer params
+        #         transformer_dim = hidden_size,
+        #         hidden_dim = mlp_dim,
+        #         num_heads = num_heads,
+        #         dropout_rate = dropout_rate,
+        #     )
+        #     self.decoders.append(layer)
             
  
         self.out = UnetOutBlock(spatial_dims=3, in_channels=feature_size, out_channels=out_channels)  # type: ignore
