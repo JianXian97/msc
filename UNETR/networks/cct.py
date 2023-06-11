@@ -149,7 +149,7 @@ class CCT(MobileVitBlock):
             fusion_channels = out_channels * 2**i            
             layer = Convolution(
                     self.dimensions,
-                    3 * fusion_channels,
+                    2 * fusion_channels,
                     fusion_channels,
                     strides=strides,
                     kernel_size=1,
@@ -229,13 +229,13 @@ class CCT(MobileVitBlock):
         
     def forward(self, f1, f2, f3, f4):
         res1, res2, res3, res4 = f1, f2, f3, f4
-        x1c, x2c, x3c, x4c = self.channel_attn(f1, f2, f3, f4)
-        x1p, x2p, x3p, x4p = self.patch_attn(f1, f2, f3, f4)
+        x1, x2, x3, x4 = self.channel_attn(f1, f2, f3, f4)
+        x1, x2, x3, x4 = self.patch_attn(x1, x2, x3, x4)
         
 
-        x1 = self.fusion_layer[0](torch.cat([res1, x1c, x1p], dim=1))
-        x2 = self.fusion_layer[1](torch.cat([res2, x2c, x2p], dim=1))
-        x3 = self.fusion_layer[2](torch.cat([res3, x3c, x3p], dim=1))
-        x4 = self.fusion_layer[3](torch.cat([res4, x4c, x4p], dim=1))
+        x1 = self.fusion_layer[0](torch.cat([res1, x1], dim=1))
+        x2 = self.fusion_layer[1](torch.cat([res2, x2], dim=1))
+        x3 = self.fusion_layer[2](torch.cat([res3, x3], dim=1))
+        x4 = self.fusion_layer[3](torch.cat([res4, x4], dim=1))
         
         return x1, x2, x3, x4
