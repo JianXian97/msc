@@ -167,22 +167,22 @@ class CCT(MobileVitBlock):
 
         
         
-    def patch_attn(self, f1, f2, f3, f4):
-        f1 = self.global_proj_layers[0](f1)
-        f2 = self.global_proj_layers[2](f2)
-        f3 = self.global_proj_layers[4](f3)
-        f4 = self.global_proj_layers[6](f4)
+    def patch_attn(self, x1, x2, x3, x4):
+        x1 = self.global_proj_layers[0](x1)
+        x2 = self.global_proj_layers[2](x2)
+        x3 = self.global_proj_layers[4](x3)
+        x4 = self.global_proj_layers[6](x4)
         
-        f1 = unfold_proj(f1, self.patch_size, self.unfold_proj_layer[0]) 
-        f2 = unfold_proj(f2, self.patch_size//2, self.unfold_proj_layer[1])
-        f3 = unfold_proj(f3, self.patch_size//4, self.unfold_proj_layer[2])
-        f4 = unfold_proj(f4, self.patch_size//8, self.unfold_proj_layer[3]) 
-        f5 = torch.cat([f1, f2, f3, f4], dim=1) 
+        x1 = unfold_proj(x1, self.patch_size, self.unfold_proj_layer[0]) 
+        x2 = unfold_proj(x2, self.patch_size//2, self.unfold_proj_layer[1])
+        x3 = unfold_proj(x3, self.patch_size//4, self.unfold_proj_layer[2])
+        x4 = unfold_proj(x4, self.patch_size//8, self.unfold_proj_layer[3]) 
+        x5 = torch.cat([x1, x2, x3, x4], dim=1) 
         
-        x1 = self.patch_transformers[0](f1, f5)
-        x2 = self.patch_transformers[1](f2, f5)
-        x3 = self.patch_transformers[2](f3, f5)
-        x4 = self.patch_transformers[3](f4, f5)
+        x1 = self.patch_transformers[0](x1, x5)
+        x2 = self.patch_transformers[1](x2, x5)
+        x3 = self.patch_transformers[2](x3, x5)
+        x4 = self.patch_transformers[3](x4, x5)
         
         x1 = fold_proj(x1, self.img_size, self.patch_size, self.fold_proj_layer[0], self.transformer_dim)
         x2 = fold_proj(x2, self.img_size//2, self.patch_size//2, self.fold_proj_layer[1], self.transformer_dim)
