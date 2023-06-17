@@ -140,8 +140,8 @@ class CAUpBlock(nn.Module):
         # number of channels for skip should equals to out_channels
         out = self.transp_conv(inp)
         
-        out = self.transformer_proj_layer[0](out)
-        skip = self.transformer_proj_layer[1](skip)
+        out = self.transformer_proj_layer[0](out) #similar to local processing on 3dmobilevit, proj from cin to E
+        skip = self.transformer_proj_layer[1](skip) #similar to local processing on 3dmobilevit, proj from cin to E
         
         out = unfold_proj(out, self.patch_size, self.unfold_proj_layer[0])
         skip = unfold_proj(skip, self.patch_size, self.unfold_proj_layer[1])
