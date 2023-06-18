@@ -265,8 +265,8 @@ class CCT(MobileVitBlock):
         
     def forward(self, f1, f2, f3, f4):
         res1, res2, res3, res4 = f1, f2, f3, f4
-        # f1, f2, f3, f4 = self.channel_attn(f1, f2, f3, f4)
-        f1, f2, f3, f4 = self.patch_attn(f1, f2, f3, f4)
+        f1, f2, f3, f4 = self.channel_attn(f1, f2, f3, f4)
+        # f1, f2, f3, f4 = self.patch_attn(f1, f2, f3, f4)
         
 
         x1 = self.fusion_layer[0](torch.cat([res1, f1], dim=1))
