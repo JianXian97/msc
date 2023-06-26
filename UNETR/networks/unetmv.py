@@ -135,7 +135,7 @@ class UNETMV(nn.Module):
                 num_heads = num_heads,
                 num_layers = 3,
                 img_size = tuple(x // 2**self.cft_scale for x in img_size),   
-                patch_size = tuple(x // 2**self.cft_scale for x in self.patch_size),
+                patch_size = tuple(x // 2**0 for x in self.patch_size),
                 out_channels = feature_size*(2**self.cft_scale),   \
                 mode = cft_mode
                 )
