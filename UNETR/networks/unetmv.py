@@ -18,6 +18,7 @@ from monai.networks.blocks import UnetrUpBlock
 from monai.networks.blocks.dynunet_block import UnetOutBlock
 from monai.networks.blocks.convolutions import Convolution
 from monai.networks.blocks.convolutions import ResidualUnit
+from monai.networks.blocks.dynunet_block import get_conv_layer
  
 from networks.mobilevit import MobileVitBlock
 from networks.gct import GCT
@@ -90,6 +91,19 @@ class UNETMV(nn.Module):
         self.hidden_size = hidden_size
         self.classification = False
         
+        self.preprocess = ResidualUnit(
+            spatial_dims = 3,
+            in_channels = in_channels,
+            out_channels = feature_size,
+            strides = 2,
+            kernel_size = 3,
+            act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
+            norm = "INSTANCE",
+            dropout = dropout_rate,
+            bias = True,
+            last_conv_only = False,
+        )
+        
         # self.gct_scale = 2
         # self.gct = GCT(
         #         in_channels = feature_size*(2**self.gct_scale),
@@ -105,7 +119,7 @@ class UNETMV(nn.Module):
         #         out_channels = feature_size*(2**self.gct_scale),        
         #         )
         
-        self.cct_scale = 0
+        self.cct_scale = 1
         self.cct = CCT(
                 in_channels = feature_size*(2**self.cct_scale),
                 dropout_rate = 0,
@@ -123,8 +137,9 @@ class UNETMV(nn.Module):
         self.downsample_blocks = nn.ModuleList()
         for i in range(5):
             patch_size = tuple(x // 2**i for x in self.patch_size)
+            img_size = tuple(x // 2 for x in img_size)
             layer = MobileVitBlock(
-                in_channels = in_channels,
+                in_channels = feature_size * (2 ** i),
                 dropout_rate = dropout_rate,
                 norm_name = norm_name,
                 #transformer params
@@ -136,10 +151,10 @@ class UNETMV(nn.Module):
                 img_size = img_size,   
                 patch_size = patch_size,
                 #mobile vit additional params
-                out_channels = feature_size * (2 ** i),        
+                out_channels = feature_size * (2 ** (i+1)),        
             )
-            in_channels = feature_size * (2 ** i)
-            img_size = tuple(x // 2 for x in img_size)
+            # in_channels = feature_size * (2 ** i)
+            
 
             self.mobilevit_blocks.append(layer)
             if i == 4:
@@ -148,8 +163,8 @@ class UNETMV(nn.Module):
             #downsample layers, only 4 needed
             layer = ResidualUnit(
                 spatial_dims = 3,
-                in_channels = feature_size * (2 ** i),
-                out_channels = feature_size * (2 ** i),
+                in_channels = feature_size * (2 ** (i+1)),
+                out_channels = feature_size * (2 ** (i+1)),
                 strides = 2,
                 kernel_size = 3,
                 act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
@@ -165,8 +180,8 @@ class UNETMV(nn.Module):
         for i in range(4):
             layer = UnetrUpBlock(
                 spatial_dims=3,
-                in_channels=feature_size * (2**(i+1)),
-                out_channels=feature_size * (2**i),
+                in_channels=feature_size * (2**(i+2)),
+                out_channels=feature_size * (2**(i+1)),
                 kernel_size=1,
                 upsample_kernel_size=2,
                 norm_name=norm_name,
@@ -191,7 +206,18 @@ class UNETMV(nn.Module):
         #         dropout_rate = dropout_rate,
         #     )
         #     self.decoders.append(layer)
-            
+        
+        self.postprocess = get_conv_layer(
+                spatial_dims=3,
+                in_channels=feature_size*2,
+                out_channels=feature_size,
+                kernel_size=2,
+                stride=2,
+                conv_only=True,
+                is_transposed=True,
+            )
+   
+
  
         self.out = UnetOutBlock(spatial_dims=3, in_channels=feature_size, out_channels=out_channels)  # type: ignore
         
@@ -201,6 +227,8 @@ class UNETMV(nn.Module):
     def forward(self, x_in):
         if not tuple(x_in.shape[2:]) == self.img_size:
             raise AssertionError(f"Input shape is wrong, expected {tuple(x_in.shape[2:])}, received {self.img_size}")
+        
+        x_in = self.preprocess(x_in)
         enc1 = self.mobilevit_blocks[0](x_in)
         x_in2 = self.downsample_blocks[0](enc1)
         enc2 = self.mobilevit_blocks[1](x_in2)
@@ -220,5 +248,5 @@ class UNETMV(nn.Module):
         dec2 = self.decoders[1](dec3, enc2)
         dec1 = self.decoders[0](dec2, enc1)
 
-        
+        dec1 = self.postprocess(dec1)
         return self.out(dec1)
