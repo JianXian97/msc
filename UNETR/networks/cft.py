@@ -14,7 +14,7 @@ from networks.gct import CrossTransformerBlock
 from monai.networks.blocks.convolutions import Convolution
 torch.manual_seed(0)
 
-class CCT(MobileVitBlock):
+class CFT(MobileVitBlock):
     def __init__ (self,
         #conv params
         in_channels: int = 1,
@@ -32,20 +32,26 @@ class CCT(MobileVitBlock):
         patch_size: Union[Sequence[int], int] = 16,
         #mobile vit additional params
         out_channels: int = 16,        
+        mode: str = "channel"
     )->None : 
         super().__init__(in_channels, strides, dropout_rate, norm_name, act_name, transformer_dim, hidden_dim, num_heads, num_layers, img_size, patch_size, out_channels)
         
+        if mode not in ['channel', 'patch', 'all']:
+            raise AssertionError("cft mode should be one of the following: 'channel', 'patch', 'all'.")
+        self.mode = mode
         
         self.patch_size = np.array(self.patch_size)
         self.img_size = np.array(self.img_size)
         
-        cross_trans_dim = np.prod(self.img_size) // np.prod(self.patch_size)
-        self.channel_transformers = nn.ModuleList(
-            [CrossTransformerBlock(cross_trans_dim, cross_trans_dim*4, num_heads, dropout_rate) for i in range(4)]
-        )
-        self.patch_transformers = nn.ModuleList(
-            [CrossTransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(4)]
-        )
+        if self.mode in ['channel', 'all']: 
+            cross_trans_dim = np.prod(self.img_size) // np.prod(self.patch_size)
+            self.channel_transformers = nn.ModuleList(
+                [CrossTransformerBlock(cross_trans_dim, cross_trans_dim*4, num_heads, dropout_rate) for i in range(4)]
+            )
+        if self.mode in ['patch', 'all']: 
+            self.patch_transformers = nn.ModuleList(
+                [CrossTransformerBlock(transformer_dim, hidden_dim, num_heads, dropout_rate) for i in range(4)]
+            )
 
         self.combine_proj = Convolution(
              self.dimensions,
@@ -144,42 +150,43 @@ class CCT(MobileVitBlock):
              padding=0,
             ) 
             self.fold_proj_layer.append(layer)
-                                    
-            layer1 = Convolution(
-                        self.dimensions,
-                        in_channels * (2**i),
-                        transformer_dim,
-                        strides=strides,
-                        kernel_size=1,
-                        adn_ordering="ADN",
-                        act=act_name,
-                        norm=norm_name,
-                        dropout=dropout_rate,
-                        dropout_dim=1,
-                        dilation=1,
-                        bias=True,
-                        conv_only=False,
-                        padding=0,
-                    ) 
-            layer2 = Convolution(
-                        self.dimensions,
-                        transformer_dim,
-                        in_channels * (2**i),
-                        strides=strides,
-                        kernel_size=1,
-                        adn_ordering="ADN",
-                        act=act_name,
-                        norm=norm_name,
-                        dropout=dropout_rate,
-                        dropout_dim=1,
-                        dilation=1,
-                        bias=True,
-                        conv_only=False,
-                        padding=0,
-                    ) 
             
-            self.global_proj_layers.append(layer1)
-            self.global_proj_layers.append(layer2)
+            if self.mode in ['patch', 'all']: 
+                layer1 = Convolution(
+                            self.dimensions,
+                            in_channels * (2**i),
+                            transformer_dim,
+                            strides=strides,
+                            kernel_size=1,
+                            adn_ordering="ADN",
+                            act=act_name,
+                            norm=norm_name,
+                            dropout=dropout_rate,
+                            dropout_dim=1,
+                            dilation=1,
+                            bias=True,
+                            conv_only=False,
+                            padding=0,
+                        ) 
+                layer2 = Convolution(
+                            self.dimensions,
+                            transformer_dim,
+                            in_channels * (2**i),
+                            strides=strides,
+                            kernel_size=1,
+                            adn_ordering="ADN",
+                            act=act_name,
+                            norm=norm_name,
+                            dropout=dropout_rate,
+                            dropout_dim=1,
+                            dilation=1,
+                            bias=True,
+                            conv_only=False,
+                            padding=0,
+                        ) 
+                
+                self.global_proj_layers.append(layer1)
+                self.global_proj_layers.append(layer2)
             
   
             fusion_channels = out_channels * 2**i            
@@ -265,8 +272,11 @@ class CCT(MobileVitBlock):
         
     def forward(self, f1, f2, f3, f4):
         res1, res2, res3, res4 = f1, f2, f3, f4
-        f1, f2, f3, f4 = self.channel_attn(f1, f2, f3, f4)
-        # f1, f2, f3, f4 = self.patch_attn(f1, f2, f3, f4)
+        
+        if self.mode in ['channel', 'all']:        
+            f1, f2, f3, f4 = self.channel_attn(f1, f2, f3, f4)
+        if self.mode in ['patch', 'all']:
+            f1, f2, f3, f4 = self.patch_attn(f1, f2, f3, f4)
         
 
         x1 = self.fusion_layer[0](torch.cat([res1, f1], dim=1))
