@@ -57,6 +57,8 @@ parser.add_argument("--roi_x", default=96, type=int, help="roi size in x directi
 parser.add_argument("--roi_y", default=96, type=int, help="roi size in y direction")
 parser.add_argument("--roi_z", default=96, type=int, help="roi size in z direction")
 parser.add_argument("--dropout_rate", default=0.0, type=float, help="dropout rate")
+parser.add_argument("--decode_mode", default='simple', type=str, help="Decoder mode, simple or CA")
+parser.add_argument("--cft_mode", default='channel', type=str, help="CFT mode, channel, patch or all")
 parser.add_argument("--distributed", action="store_true", help="start distributed training")
 parser.add_argument("--workers", default=8, type=int, help="number of workers")
 parser.add_argument("--model_name", default="unetr", type=str, help="model name")
@@ -108,6 +110,8 @@ def main():
                 conv_block=True,
                 res_block=True,
                 dropout_rate=args.dropout_rate,
+                decode_mode=args.decode_mode,
+                cft_mode=args.cft_mode   
             )
         model_dict = torch.load(pretrained_pth)
         try:
