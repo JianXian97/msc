@@ -36,13 +36,13 @@ class CABlock(nn.Module):
         self.scale = self.head_dim**-0.5
 
     def forward(self, xq, xkv):
-        q = einops.rearrange(self.q(xq), "b h (q l d) -> q b l h d", q=1, l=self.num_heads)
-        k, v = einops.rearrange(self.kv(xkv), "b h (kv l d) -> kv b l h d", kv=2, l=self.num_heads)
+        q = einops.rearrange(self.q(xq), "b h (q l d) -> q b l h d", q=1, l=self.num_heads).contiguous()
+        k, v = einops.rearrange(self.kv(xkv), "b h (kv l d) -> kv b l h d", kv=2, l=self.num_heads).contiguous()
 
         att_mat = (torch.einsum("blxd,blyd->blxy", q.squeeze(0), k) * self.scale).softmax(dim=-1)
         att_mat = self.drop_weights(att_mat)
         x = torch.einsum("bhxy,bhyd->bhxd", att_mat, v)
-        x = einops.rearrange(x, "b h l d -> b l (h d)")
+        x = einops.rearrange(x, "b h l d -> b l (h d)").contiguous()
         x = self.out_proj(x)
         x = self.drop_output(x)
         return x

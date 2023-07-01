@@ -264,11 +264,11 @@ def unfold_proj(x, patch_size, unfold_proj_layer):
     from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
     to_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
     axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
-    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x)
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)(x).contiguous()
     x = unfold_proj_layer(x)
     from_chars = "b z y c"
     to_chars = "(b z) y c"
-    x = Rearrange(f"{from_chars} -> {to_chars}")(x)
+    x = Rearrange(f"{from_chars} -> {to_chars}")(x).contiguous()
     
     '''
     chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
@@ -307,12 +307,12 @@ def fold_proj(x, img_size, patch_size, fold_proj_layer, transformer_dim):
  
     from_chars = "(b z) y c"
     to_chars = "b z y c"
-    x = Rearrange(f"{from_chars} -> {to_chars}", z = transformer_dim)(x)        
+    x = Rearrange(f"{from_chars} -> {to_chars}", z = transformer_dim)(x).contiguous()        
     x = fold_proj_layer(x)
     
     from_chars = f"b ({' '.join([c[1] for c in chars])}) ({' '.join([c[0] for c in chars])}) c"
     to_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x) 
+    x = Rearrange(f"{from_chars} -> {to_chars}", **axes_len, **num_per_axis)(x).contiguous() 
     
     '''
     chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:self.dimensions]
