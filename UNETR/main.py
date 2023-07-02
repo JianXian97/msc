@@ -28,7 +28,7 @@ from utils.data_utils import get_loader
 
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceCELoss, DiceLoss
-from monai.metrics import DiceMetric
+from monai.metrics import DiceMetric, HausdorffDistanceMetric
 from monai.transforms import Activations, AsDiscrete, Compose
 from monai.utils.enums import MetricReduction
 
@@ -202,6 +202,8 @@ def main_worker(gpu, args):
     post_label = AsDiscrete(to_onehot=True, n_classes=args.out_channels)
     post_pred = AsDiscrete(argmax=True, to_onehot=True, n_classes=args.out_channels)
     dice_acc = DiceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
+    hd_acc = HausdorffDistanceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True, percentile=95)
+    
     model_inferer = partial(
         sliding_window_inference,
         roi_size=inf_size,
@@ -268,6 +270,7 @@ def main_worker(gpu, args):
         optimizer=optimizer,
         loss_func=dice_loss,
         acc_func=dice_acc,
+        hd_func=hd_acc,
         args=args,
         model_inferer=model_inferer,
         scheduler=scheduler,
@@ -305,6 +308,7 @@ def main_worker_tune(gpu, args):
     post_label = AsDiscrete(to_onehot=True, n_classes=args.out_channels)
     post_pred = AsDiscrete(argmax=True, to_onehot=True, n_classes=args.out_channels)
     dice_acc = DiceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
+    hd_acc = HausdorffDistanceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
 
     hyper_params = {
         'decode_mode': ['CA', 'simple'],
@@ -409,6 +413,7 @@ def main_worker_tune(gpu, args):
             optimizer=optimizer,
             loss_func=dice_loss,
             acc_func=dice_acc,
+            hd_func=hd_acc,
             args=args,
             model_inferer=model_inferer,
             scheduler=scheduler,

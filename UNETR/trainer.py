@@ -23,7 +23,6 @@ from utils.utils import distributed_all_gather
 
 from monai.data import decollate_batch
 
-
 def dice(x, y):
     intersect = np.sum(np.sum(np.sum(x * y)))
     y_sum = np.sum(np.sum(np.sum(y)))
@@ -91,7 +90,7 @@ def train_epoch(model, loader, optimizer, scaler, epoch, loss_func, args):
     return run_loss.avg
 
 
-def val_epoch(model, loader, epoch, acc_func, args, model_inferer=None, post_label=None, post_pred=None):
+def val_epoch(model, loader, epoch, acc_func, hd_func, args, model_inferer=None, post_label=None, post_pred=None):
     model.eval()
     start_time = time.time()
     with torch.no_grad():
@@ -114,24 +113,33 @@ def val_epoch(model, loader, epoch, acc_func, args, model_inferer=None, post_lab
             val_output_convert = [post_pred(val_pred_tensor) for val_pred_tensor in val_outputs_list]
             acc = acc_func(y_pred=val_output_convert, y=val_labels_convert)
             acc = acc.cuda(args.rank)
+            
+            hd = hd_func(y_pred=val_output_convert, y=val_labels_convert)
+            hd = hd.cuda(args.rank)
 
             if args.distributed:
                 acc_list = distributed_all_gather([acc], out_numpy=True, is_valid=idx < loader.sampler.valid_length)
                 avg_acc = np.mean([np.nanmean(l) for l in acc_list])
+                hd_list = distributed_all_gather([hd], out_numpy=True, is_valid=idx < loader.sampler.valid_length)
+                avg_hd = np.mean([np.nanmean(l) for l in hd_list])
 
             else:
                 acc_list = acc.detach().cpu().numpy()
                 avg_acc = np.mean([np.nanmean(l) for l in acc_list])
+                hd_list = hd.detach().cpu().numpy()
+                avg_hd = np.mean([np.nanmean(l) for l in hd_list])
  
             if args.rank == 0:
                 print(
                     "Val {}/{} {}/{}".format(epoch, args.max_epochs, idx, len(loader)),
                     "acc",
                     avg_acc,
+                    "95HD",
+                    avg_hd,
                     "time {:.2f}s".format(time.time() - start_time),
                 )
             start_time = time.time()
-    return avg_acc
+    return avg_acc, avg_hd
 
 
 def save_checkpoint(model, epoch, args, filename = "model.pt", best_acc=0, optimizer=None, scheduler=None):
@@ -153,6 +161,7 @@ def run_training(
     optimizer,
     loss_func,
     acc_func,
+    hd_func,
     args,
     model_inferer=None,
     scheduler=None,
@@ -169,6 +178,7 @@ def run_training(
     if args.amp:
         scaler = GradScaler()
     val_acc_max = 0.0
+    val_hd_min = 0.0
     for epoch in range(start_epoch, args.max_epochs):
         if args.distributed:
             train_loader.sampler.set_epoch(epoch)
@@ -191,11 +201,12 @@ def run_training(
             if args.distributed:
                 torch.distributed.barrier()
             epoch_time = time.time()
-            val_avg_acc = val_epoch(
+            val_avg_acc, val_avg_hd = val_epoch(
                 model,
                 val_loader,
                 epoch=epoch,
                 acc_func=acc_func,
+                hd_func=hd_func,
                 model_inferer=model_inferer,
                 args=args,
                 post_label=post_label,
@@ -206,13 +217,17 @@ def run_training(
                     "Final validation  {}/{}".format(epoch, args.max_epochs - 1),
                     "acc",
                     val_avg_acc,
+                    "95HD",
+                    val_avg_hd,
                     "time {:.2f}s".format(time.time() - epoch_time),
                 )
                 # if writer is not None:
                     # writer.add_scalar("val_acc", val_avg_acc, epoch)
                 if val_avg_acc > val_acc_max:
                     print("new best ({:.6f} --> {:.6f}). ".format(val_acc_max, val_avg_acc))
+                    print("new best ({:.6f} --> {:.6f}). ".format(val_hd_min, val_avg_hd))
                     val_acc_max = val_avg_acc
+                    val_hd_min = val_avg_hd
                     b_new_best = True
                     if args.rank == 0 and args.logdir is not None and args.save_checkpoint:
                         save_checkpoint(
