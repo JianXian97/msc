@@ -213,26 +213,16 @@ class UNETMV(nn.Module):
                 
                 
         else:#mode == "CA"
-            layer = UnetrUpBlock(
-                spatial_dims=3,
-                in_channels=feature_size * (2**(1)),
-                out_channels=feature_size * (2**(0)),
-                kernel_size=1,
-                upsample_kernel_size=2,
-                norm_name=norm_name,
-                res_block=res_block,
-            )
-            self.decoders.append(layer)
-            for i in range(4):
+            for i in range(5):
                 layer = CAUpBlock(
                     spatial_dims = 3,
-                    in_channels=feature_size * (2**(i+2)),
-                    out_channels=feature_size * (2**(i+1)),
+                    in_channels=feature_size * (2**(i+1)),
+                    out_channels=feature_size * (2**(i)),
                     kernel_size = 1,
                     upsample_kernel_size = 2,
                     norm_name = norm_name,
-                    patch_size = tuple(x // 2**i for x in self.patch_size),
-                    img_size = tuple(x // 2**(i+1) for x in self.img_size),
+                    patch_size = tuple(int(x // 2**(i-1)) for x in self.patch_size),
+                    img_size = tuple(x // 2**(i) for x in self.img_size),
                     #transformer params
                     transformer_dim = hidden_size,
                     hidden_dim = mlp_dim,
