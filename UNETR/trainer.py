@@ -12,6 +12,8 @@
 import os
 import shutil
 import time
+import warnings
+warnings.filterwarnings("ignore", message="the ground truth of class ") #HD distance warning ignore
 
 import numpy as np
 import torch
