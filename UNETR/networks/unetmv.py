@@ -213,16 +213,26 @@ class UNETMV(nn.Module):
                 
                 
         else:#mode == "CA"
-            for i in range(5):
+            layer = UnetrUpBlock(
+                spatial_dims=3,
+                in_channels=feature_size * (2**(1)),
+                out_channels=feature_size * (2**(0)),
+                kernel_size=1,
+                upsample_kernel_size=2,
+                norm_name=norm_name,
+                res_block=res_block,
+            )
+            self.decoders.append(layer)
+            for i in range(4):
                 layer = CAUpBlock(
                     spatial_dims = 3,
-                    in_channels=feature_size * (2**(i+1)),
-                    out_channels=feature_size * (2**(i)),
+                    in_channels=feature_size * (2**(i+2)),
+                    out_channels=feature_size * (2**(i+1)),
                     kernel_size = 1,
                     upsample_kernel_size = 2,
                     norm_name = norm_name,
-                    patch_size = tuple(x // 2**(i-1) for x in self.patch_size),
-                    img_size = tuple(x // 2**(i) for x in self.img_size),
+                    patch_size = tuple(x // 2**i for x in self.patch_size),
+                    img_size = tuple(x // 2**(i+1) for x in self.img_size),
                     #transformer params
                     transformer_dim = hidden_size,
                     hidden_dim = mlp_dim,
@@ -230,8 +240,8 @@ class UNETMV(nn.Module):
                     dropout_rate = dropout_rate,
                 )
                 self.decoders.append(layer)
-        
-  
+            
+            
         # self.postprocess = self.decoders[0]
         # self.postprocess = get_conv_layer(
         #         spatial_dims=3,
