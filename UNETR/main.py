@@ -310,6 +310,8 @@ def main_worker_tune(gpu, args):
     dice_acc = DiceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
     hd_acc = HausdorffDistanceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
 
+    args.checkpoint_filename_old = args.checkpoint_filename
+
     hyper_params = {
         'decode_mode': ['CA', 'simple'],
         'cft_mode': ['channel', 'patch', 'all']
@@ -324,7 +326,8 @@ def main_worker_tune(gpu, args):
         cft_mode = c[1]
         print(str(count+1) + "/" + str(len(combinations)) + " Training modes " + c[0] + " " + c[1])
         
-        args.checkpoint_filename = args.checkpoint_filename[:-3] + "_" + decode_mode + "_" + cft_mode + "_" + ".pt" 
+        
+        args.checkpoint_filename = args.checkpoint_filename_old[:-3] + "_" + decode_mode + "_" + cft_mode + "_" + ".pt" 
         
         if (args.model_name is None) or args.model_name == "unetmv":
             model = UNETMV(
