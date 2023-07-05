@@ -355,7 +355,8 @@ def tune(args):
         combinations = list(itertools.product(*hyper_params.values()))        
         manager = mp.Manager()
         args.q = manager.Queue()
-    
+        
+        args.checkpoint_filename_old = args.checkpoint_filename
         for count, c in enumerate(combinations):
             args.decode_mode = c[0]
             args.cft_mode = c[1]
