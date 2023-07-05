@@ -102,7 +102,8 @@ parser.add_argument("--resume_ckpt", action="store_true", help="resume training 
 parser.add_argument("--resume_jit", action="store_true", help="resume training from pretrained torchscript checkpoint")
 parser.add_argument("--smooth_dr", default=1e-6, type=float, help="constant added to dice denominator to avoid nan")
 parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added to dice numerator to avoid zero")
-parser.add_argument("--tune", action="store_true", help="Tune model architecture, by fixing the hyper parameters")
+parser.add_argument("--tune", action="store_true", help="Tune model architecture by fixing the hyper parameters")
+parser.add_argument("--optuna", action="store_true", help="Run optuna, hyperparameter tuning")
 
 
 def main():
@@ -114,20 +115,35 @@ def main():
     # args.logdir = "./runs/" + args.logdir
     # args.tune = True
     
+    assert not (args.tune and args.optuna), "optuna and tune cannot be run simultaneously!"
+    if args.optuna:
+        optimise(args)
+    else:
+        if args.distributed:
+            args.ngpus_per_node = torch.cuda.device_count()
+            print("Found total gpus", args.ngpus_per_node)
+            args.world_size = args.ngpus_per_node * args.world_size
+            if args.tune:
+                mp.spawn(main_worker_tune, nprocs=args.ngpus_per_node, args=(args,))       
+            else:
+                mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
+        else:
+            if args.tune:
+                main_worker_tune(gpu=0, args=args)
+            else:
+                main_worker(gpu=0, args=args)
+
+def optimise(args):
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
         print("Found total gpus", args.ngpus_per_node)
         args.world_size = args.ngpus_per_node * args.world_size
-        if args.tune:
-            mp.spawn(main_worker_tune, nprocs=args.ngpus_per_node, args=(args,))
-        else:
-            mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
-    else:
-        if args.tune:
-            main_worker_tune(gpu=0, args=args)
-        else:
-            main_worker(gpu=0, args=args)
-
+        
+        manager = mp.Manager()
+        args.q = manager.Queue()
+        mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
+        
+        print("success! " + str(args.q.get()))
 
 def main_worker(gpu, args):
 
@@ -278,9 +294,12 @@ def main_worker(gpu, args):
         post_label=post_label,
         post_pred=post_pred,
     )
+    
+    if args.optuna: #store output in a queue
+        # accuracy.share_memory_()
+        args.q.put(accuracy)
+        
     return accuracy
-
-
 
 def main_worker_tune(gpu, args):
 
