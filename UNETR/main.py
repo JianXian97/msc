@@ -385,7 +385,7 @@ def tune(args):
             new_params[var] = points[var]
             for i in range(num_pts):        
                 count += 1
-                print(str(count) + "/" + str(2 * num_pts) + " E " + new_params['E'][i] + " F " + new_params['F'][i])
+                print(str(count) + "/" + str(2 * num_pts) + " E " + str(new_params['E'][i]) + " F " + str(new_params['F'][i]))
                 args.hidden_size = new_params['E'][i]
                 args.feature_size = new_params['F'][i]
                 
@@ -395,7 +395,7 @@ def tune(args):
                 else:
                     accuracy = main_worker(gpu=0, args=args)
                     
-                output["Var: " + var + " E: " + new_params['E'][i] + " F: " + new_params['F']] = accuracy
+                output["Var: " + var + " E: " + str(new_params['E'][i]) + " F: " + str(new_params['F'])] = accuracy
     else:
         raise("Invalid tune mode")
     
