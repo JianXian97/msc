@@ -11,6 +11,7 @@
 
 import argparse
 import os
+import gc
 from functools import partial
 
 import numpy as np
@@ -139,7 +140,7 @@ def optimise(args):
     def objective(trial):
         
         args.optim_name = trial.suggest_categorical("optimizer", ['adamw', 'sgd', 'adam'])
-        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.1))        
+        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.6,0.1))        
         lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
         
         
@@ -341,7 +342,10 @@ def main_worker(gpu, args):
     if args.optuna or args.tune_mode != None: #store output in a queue
         # accuracy.share_memory_()
         args.q.put(accuracy)
-        
+    
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
     return accuracy
 
 
@@ -368,6 +372,7 @@ def tune(args):
                 accuracy = main_worker(gpu=0, args=args)
                 
             output[c[0] + "_" + c[1]] = accuracy
+            del accuracy
             
     elif args.tune_mode == "EF":
         num_pts = 5
@@ -394,6 +399,7 @@ def tune(args):
                     accuracy = main_worker(gpu=0, args=args)
                     
                 output["Var: " + var + " E: " + str(new_params['E'][i]) + " F: " + str(new_params['F'])] = accuracy
+                del accuracy
     else:
         raise("Invalid tune mode")
     
