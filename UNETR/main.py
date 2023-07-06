@@ -142,6 +142,8 @@ def optimise(args):
         args.optim_name = trial.suggest_categorical("optimizer", ['adamw', 'sgd', 'adam'])
         args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.6,0.1))        
         lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
+        args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,72,144,288])
+        args.feature_size = trial.suggest_categorical("Model feature size, F", [2,4,8,16,32])
         
         
         if args.distributed:
