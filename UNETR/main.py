@@ -379,11 +379,13 @@ def tune(args):
         points = {'E' : [18,36,72,144,288],
                   'F' : [2,4,8,16,32]
             }
+        count = 0
         for pos, var in enumerate(['E', 'F']):
             new_params = params.copy()
             new_params[var] = points[var]
             for i in range(num_pts):        
-                print(str(count+1) + "/" + str(len(combinations)) + " E " + new_params['E'][i] + " F " + new_params['F'][i])
+                count += 1
+                print(str(count) + "/" + str(2 * num_pts) + " E " + new_params['E'][i] + " F " + new_params['F'][i])
                 args.hidden_size = new_params['E'][i]
                 args.feature_size = new_params['F'][i]
                 
