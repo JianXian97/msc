@@ -120,8 +120,10 @@ def main():
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
         print("Found total gpus", args.ngpus_per_node)
-        args.world_size = args.ngpus_per_node * args.world_size 
-        
+        args.world_size = args.ngpus_per_node * args.world_size
+        manager = mp.Manager()
+        args.q = manager.Queue()
+                
     assert not (args.tune_mode != None and args.optuna), "optuna and tune cannot be run simultaneously!"
     if args.optuna:
         optimise(args)
@@ -150,8 +152,6 @@ def optimise(args):
             print("Found total gpus", args.ngpus_per_node)
             args.world_size = args.ngpus_per_node * args.world_size
             
-            manager = mp.Manager()
-            args.q = manager.Queue()
             mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
             
             accuracy = args.q.get()
@@ -352,10 +352,8 @@ def tune(args):
             'decode_mode': ['CA', 'simple'],
             'cft_mode': ['channel', 'patch', 'all']
         }
-        combinations = list(itertools.product(*hyper_params.values()))        
-        manager = mp.Manager()
-        args.q = manager.Queue()
-        
+        combinations = list(itertools.product(*hyper_params.values()))    
+
         args.checkpoint_filename_old = args.checkpoint_filename
         for count, c in enumerate(combinations):
             args.decode_mode = c[0]
