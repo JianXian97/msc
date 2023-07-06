@@ -139,12 +139,12 @@ def main():
 def optimise(args):
     def objective(trial):
         
-        args.optim_name = trial.suggest_categorical("optimizer", ['adamw', 'sgd', 'adam'])
-        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.6,0.1))        
+        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.2))        
         lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
         args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,72,144,288])
         args.feature_size = trial.suggest_categorical("Model feature size, F", [2,4,8,16,32])
-        
+        args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
+        args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
         
         if args.distributed:
             args.ngpus_per_node = torch.cuda.device_count()
@@ -168,7 +168,7 @@ def optimise(args):
         return accuracy
     
     study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=30)
+    study.optimize(objective, n_trials=50)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
