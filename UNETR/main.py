@@ -160,7 +160,9 @@ def optimise(args):
         else:
             args.optim_lr = trial.suggest_categorical("lr", lr_list)
             accuracy = main_worker(gpu=0, args=args)
-           
+         
+        gc.collect()
+        torch.cuda.empty_cache()
         return accuracy
     
     study = optuna.create_study(direction='maximize')
@@ -344,8 +346,7 @@ def main_worker(gpu, args):
         args.q.put(accuracy)
     
     del model
-    gc.collect()
-    torch.cuda.empty_cache()
+
     return accuracy
 
 
@@ -374,6 +375,9 @@ def tune(args):
             output[c[0] + "_" + c[1]] = accuracy
             del accuracy
             
+            gc.collect()
+            torch.cuda.empty_cache()
+            
     elif args.tune_mode == "EF":
         num_pts = 5
         params = {'E' : [args.hidden_size for i in range(num_pts)],
@@ -400,6 +404,9 @@ def tune(args):
                     
                 output["Var: " + var + " E: " + str(new_params['E'][i]) + " F: " + str(new_params['F'])] = accuracy
                 del accuracy
+            
+            gc.collect()
+            torch.cuda.empty_cache()
     else:
         raise("Invalid tune mode")
     
