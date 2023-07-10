@@ -110,18 +110,18 @@ class UNETMV(nn.Module):
             last_conv_only = False,
         )
         
-        self.skip = ResidualUnit(
-            spatial_dims = 3,
-            in_channels = in_channels,
-            out_channels = feature_size,
-            strides = 1,
-            kernel_size = 3,
-            act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
-            norm = "INSTANCE",
-            dropout = dropout_rate,
-            bias = True,
-            last_conv_only = False,
-        )
+        # self.skip = ResidualUnit(
+        #     spatial_dims = 3,
+        #     in_channels = in_channels,
+        #     out_channels = feature_size,
+        #     strides = 1,
+        #     kernel_size = 3,
+        #     act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
+        #     norm = "INSTANCE",
+        #     dropout = dropout_rate,
+        #     bias = True,
+        #     last_conv_only = False,
+        # )
         
         # self.gct_scale = 2
         # self.gct = GCT(
@@ -199,11 +199,11 @@ class UNETMV(nn.Module):
 
         self.decoders = nn.ModuleList()
         if decode_mode == "simple":
-            for i in range(5):
+            for i in range(4):
                 layer = UnetrUpBlock(
                     spatial_dims=3,
-                    in_channels=feature_size * (2**(i+1)),
-                    out_channels=feature_size * (2**(i)),
+                    in_channels=feature_size * (2**(i+2)),
+                    out_channels=feature_size * (2**(i+1)),
                     kernel_size=1,
                     upsample_kernel_size=2,
                     norm_name=norm_name,
@@ -213,16 +213,16 @@ class UNETMV(nn.Module):
                 
                 
         else:#mode == "CA"
-            for i in range(5):
+            for i in range(4):
                 layer = CAUpBlock(
                     spatial_dims = 3,
-                    in_channels=feature_size * (2**(i+1)),
-                    out_channels=feature_size * (2**(i)),
+                    in_channels=feature_size * (2**(i+2)),
+                    out_channels=feature_size * (2**(i+1)),
                     kernel_size = 1,
                     upsample_kernel_size = 2,
                     norm_name = norm_name,
-                    patch_size = tuple(int(x // 2**(i-1)) for x in self.patch_size),
-                    img_size = tuple(x // 2**(i) for x in self.img_size),
+                    patch_size = tuple(int(x // 2**(i)) for x in self.patch_size),
+                    img_size = tuple(x // 2**(i+1) for x in self.img_size),
                     #transformer params
                     transformer_dim = hidden_size,
                     hidden_dim = mlp_dim,
@@ -233,15 +233,15 @@ class UNETMV(nn.Module):
             
             
         # self.postprocess = self.decoders[0]
-        # self.postprocess = get_conv_layer(
-        #         spatial_dims=3,
-        #         in_channels=feature_size*2,
-        #         out_channels=feature_size,
-        #         kernel_size=2,
-        #         stride=2,
-        #         conv_only=True,
-        #         is_transposed=True,
-        #     )
+        self.postprocess = get_conv_layer(
+                spatial_dims=3,
+                in_channels=feature_size*2,
+                out_channels=feature_size,
+                kernel_size=2,
+                stride=2,
+                conv_only=True,
+                is_transposed=True,
+            )
    
 
  
@@ -269,11 +269,12 @@ class UNETMV(nn.Module):
         
         # z = self.gct(enc3, enc4, enc5)
         
-        dec4 = self.decoders[4](enc5, enc4)       
-        dec3 = self.decoders[3](dec4, enc3)              
-        dec2 = self.decoders[2](dec3, enc2)
-        dec1 = self.decoders[1](dec2, enc1)
+        dec4 = self.decoders[3](enc5, enc4)       
+        dec3 = self.decoders[2](dec4, enc3)              
+        dec2 = self.decoders[1](dec3, enc2)
+        dec1 = self.decoders[0](dec2, enc1)
 
-        skip = self.skip(x_in)
-        dec1 = self.decoders[0](dec1, skip)
+        # skip = self.skip(x_in)
+        # dec1 = self.decoders[0](dec1, skip)
+        dec1 = self.postprocess(dec1)
         return self.out(dec1)
