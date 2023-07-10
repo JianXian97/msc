@@ -352,6 +352,8 @@ def main_worker(gpu, args):
         args.q.put(accuracy)
     
     del model
+    print("Indiv Print GPU " + str(torch.distributed.get_rank()))
+    print(torch.cuda.mem_get_info(device=torch.distributed.get_rank()))
 
     return accuracy
 
@@ -405,8 +407,7 @@ def tune(args):
                 if args.distributed:
                     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))        
                     accuracy = args.q.get()
-                    print("Indiv Print GPU " + str(torch.distributed.get_rank()))
-                    print(torch.cuda.mem_get_info(device=torch.distributed.get_rank()))
+
                 else:
                     accuracy = main_worker(gpu=0, args=args)
                     
