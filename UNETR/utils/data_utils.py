@@ -65,6 +65,19 @@ class Sampler(torch.utils.data.Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
+def generate_splits(total_length, num_splits, split_num):
+    total = np.arange(total_length)
+ 
+    splits = {}
+    for i in range(num_splits):
+        splits[i] = total[i:total_length:num_splits]
+        
+    val_indices = splits[split_num]
+    train_indices = np.array(list(set(total) - set(val_indices)))
+    
+    return train_indices, val_indices
+    
+    
 def get_loader(args):
     if "BTCV" in args.data_dir or "ACDC" in args.data_dir:
         return get_loader_BTCV(args)
@@ -139,6 +152,11 @@ def get_loader_BTCV(args):
         loader = test_loader
     else:
         datalist = load_decathlon_datalist(datalist_json, True, "training", base_dir=data_dir)
+        if args.kfold:
+            train_indices, val_indices = generate_splits(len(datalist), args.num_kfold, args.kfold_split)
+            val_files = np.array(datalist)[val_indices]
+            datalist = np.array(datalist)[train_indices]
+            
         if args.use_normal_dataset:
             train_ds = data.Dataset(data=datalist, transform=train_transform)
         else:
@@ -155,7 +173,9 @@ def get_loader_BTCV(args):
             pin_memory=True,
             persistent_workers=True,
         )
-        val_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
+        if not args.kfold: #if it's kfold, it has been generated in the prev lines
+            val_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
+            
         val_ds = data.Dataset(data=val_files, transform=val_transform)
         val_sampler = Sampler(val_ds, shuffle=False) if args.distributed else None
         val_loader = data.DataLoader(
@@ -299,6 +319,12 @@ def get_loader_AMOS(args):
         loader = test_loader
     else:
         datalist = load_decathlon_datalist(datalist_json, True, "training", base_dir=data_dir)
+        if args.kfold:
+            train_indices, val_indices = generate_splits(len(datalist), args.num_kfold, args.kfold_split)
+            val_files = np.array(datalist)[val_indices]
+            datalist = np.array(datalist)[train_indices]
+            
+        
         if args.use_normal_dataset:
             train_ds = data.Dataset(data=datalist, transform=train_transform)
         else:
@@ -315,7 +341,8 @@ def get_loader_AMOS(args):
             pin_memory=True,
             persistent_workers=True,
         )
-        val_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
+        if not args.kfold: #if it's kfold, it has been generated in the prev lines
+            val_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
         val_ds = data.Dataset(data=val_files, transform=val_transform)
         val_sampler = Sampler(val_ds, shuffle=False) if args.distributed else None
         val_loader = data.DataLoader(
