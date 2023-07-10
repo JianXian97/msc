@@ -195,7 +195,7 @@ def optimise(args):
 def main_worker(gpu, args):
 
     if args.distributed:
-        torch.multiprocessing.set_start_method("fork", force=True)
+        torch.multiprocessing.set_start_method("spawn", force=True)
     np.set_printoptions(formatter={"float": "{: 0.3f}".format}, suppress=True)
     args.gpu = gpu
     if args.distributed:
@@ -357,7 +357,6 @@ def main_worker(gpu, args):
 
 def tune(args):
     output = {}
-    mp.set_start_method('spawn')
     if args.tune_mode == "archi":
         hyper_params = {
             'decode_mode': ['CA', 'simple'],
@@ -373,11 +372,8 @@ def tune(args):
             args.checkpoint_filename = args.checkpoint_filename_old[:-3] + "_" + args.decode_mode + "_" + args.cft_mode + "_" + ".pt" 
             
             if args.distributed:
-                # mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))        
-                p = mp.Process(target=main_worker, nprocs=args.ngpus_per_node, args=(args,))     
-                p.start()
+                mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))        
                 accuracy = args.q.get()
-                p.join()
             else:
                 accuracy = main_worker(gpu=0, args=args)
                 
@@ -406,10 +402,8 @@ def tune(args):
                 args.feature_size = new_params['F'][i]
                 
                 if args.distributed:
-                    p = mp.Process(target=main_worker, nprocs=args.ngpus_per_node, args=(args,))     
-                    p.start()
+                    mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))        
                     accuracy = args.q.get()
-                    p.join()
                 else:
                     accuracy = main_worker(gpu=0, args=args)
                     
