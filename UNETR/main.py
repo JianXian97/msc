@@ -196,7 +196,7 @@ def optimise(args):
 def main_worker(gpu, args):
 
     if args.distributed:
-        torch.multiprocessing.set_start_method("spawn", force=True)
+        torch.multiprocessing.set_start_method("fork", force=True)
     np.set_printoptions(formatter={"float": "{: 0.3f}".format}, suppress=True)
     args.gpu = gpu
     if args.distributed:
