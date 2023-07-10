@@ -126,11 +126,14 @@ def main():
         args.q = manager.Queue()
                 
     assert not (args.tune_mode != None and args.optuna), "optuna and tune cannot be run simultaneously!"
-    if args.optuna:
+    args.kfold = False
+    if args.optuna:            
+        args.kfold = True
+        args.num_kfold = 5
         optimise(args)
     elif args.tune_mode != None:
         tune(args)
-    else:
+    else:            
         if args.distributed:            
             mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
         else:
@@ -166,9 +169,7 @@ def optimise(args):
             torch.cuda.empty_cache()
             
         return accuracy/args.num_kfold
-    
-    args.kfold = True
-    args.num_kfold = 5
+
     
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=50)
