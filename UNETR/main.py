@@ -405,14 +405,15 @@ def tune(args):
                 if args.distributed:
                     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))        
                     accuracy = args.q.get()
+                    print("GPU " + str(torch.distributed.get_rank()))
+                    print(torch.cuda.mem_get_info(device=torch.distributed.get_rank()))
                 else:
                     accuracy = main_worker(gpu=0, args=args)
                     
                 output["Var: " + var + " E: " + str(new_params['E'][i]) + " F: " + str(new_params['F'])] = accuracy
                 del accuracy
                 
-                print("GPU " + str(torch.distributed.get_rank()))
-                print(torch.cuda.mem_get_info(device=torch.distributed.get_rank()))
+            gpu_usage(args)
             
             gc.collect()
             torch.cuda.empty_cache()
@@ -558,6 +559,13 @@ def main_worker_tune(gpu, args):
     return output[0][1]
 
 
+def gpu_usage(args):
+    for i in range(args.ngpus_per_node):
+        print("___________________________________________________")
+        print("gpu " + str(i) + ": ", end="")
+        print(args.ngpus_per_node(i))
+        print("___________________________________________________")
 
+        
 if __name__ == "__main__":
     main()
