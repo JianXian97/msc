@@ -414,8 +414,8 @@ def tune(args):
                 output["Var: " + var + " E: " + str(new_params['E'][i]) + " F: " + str(new_params['F'])] = accuracy
                 del accuracy
                 
-                gc.collect()
-                torch.cuda.empty_cache()
+                # gc.collect()
+                # torch.cuda.empty_cache()
                 gpu_usage(args)
     else:
         raise("Invalid tune mode")
