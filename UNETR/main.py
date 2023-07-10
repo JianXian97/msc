@@ -410,6 +410,9 @@ def tune(args):
                     
                 output["Var: " + var + " E: " + str(new_params['E'][i]) + " F: " + str(new_params['F'])] = accuracy
                 del accuracy
+                
+                print("GPU " + str(torch.distributed.get_rank()))
+                print(torch.cuda.mem_get_info(device=torch.distributed.get_rank()))
             
             gc.collect()
             torch.cuda.empty_cache()
