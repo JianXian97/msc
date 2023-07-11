@@ -391,8 +391,8 @@ def tune(args):
         params = {'E' : [args.hidden_size for i in range(num_pts)],
                   'F' : [args.feature_size for i in range(num_pts)]
             }
-        points = {'E' : [18,36,72,144,288],
-                  'F' : [2,4,8,16,32]
+        points = {'E' : [18,36,72,144,288][::-1],
+                  'F' : [2,4,8,16,32][::-1]
             }
         count = 0
         for pos, var in enumerate(['E', 'F']):
