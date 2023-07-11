@@ -561,11 +561,15 @@ def main_worker_tune(gpu, args):
 
 
 def gpu_usage(args):
-    for i in range(args.ngpus_per_node):
-        print("___________________________________________________")
-        print("gpu " + str(i) + ": ", end="")
-        print(torch.cuda.mem_get_info(i))
-        print("___________________________________________________")
+    print("___________________________________________________")
+    print("gpu ")
+    print(torch.cuda.mem_get_info())
+    print("___________________________________________________")
+    # for i in range(args.ngpus_per_node):
+    #     print("___________________________________________________")
+    #     print("gpu " + str(i) + ": ", end="")
+    #     print(torch.cuda.mem_get_info(i))
+    #     print("___________________________________________________")
 
         
 if __name__ == "__main__":
