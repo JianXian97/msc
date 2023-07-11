@@ -417,7 +417,7 @@ def tune(args):
                 # gc.collect()
                 # torch.cuda.empty_cache()
                 # torch.distributed.barrier()
-                gpu_usage(args)
+                # gpu_usage(args)
     else:
         raise("Invalid tune mode")
     
