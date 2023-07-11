@@ -144,8 +144,8 @@ def optimise(args):
         
         args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.2))        
         lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
-        args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,72,144,288])
-        args.feature_size = trial.suggest_categorical("Model feature size, F", [2,4,8,16,32])
+        args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,54,72,90])
+        args.feature_size = trial.suggest_categorical("Model feature size, F", [4,8,12,16,20])
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
         args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
         
@@ -352,8 +352,10 @@ def main_worker(gpu, args):
         args.q.put(accuracy)
     
     del model
-    print("Indiv Print GPU " + str(torch.distributed.get_rank()))
-    print(torch.cuda.mem_get_info(device=torch.distributed.get_rank()))
+    gc.collect()
+    torch.cuda.empty_cache()
+    # print("Indiv Print GPU " + str(torch.distributed.get_rank()))
+    # print(torch.cuda.mem_get_info(device=torch.distributed.get_rank()))
 
     return accuracy
 
@@ -392,7 +394,7 @@ def tune(args):
                   'F' : [args.feature_size for i in range(num_pts)]
             }
         points = {'E' : [18,36,72,144,288][::-1],
-                  'F' : [2,4,8,16,32][::-1]
+                  'F' : [4,8,12,16,20,24][::-1]
             }
         count = 0
         for pos, var in enumerate(['E', 'F']):
@@ -427,139 +429,7 @@ def tune(args):
     print("Best acc: " + str(output[0][1]))
     return output[0][1] 
 
-
-def main_worker_tune(gpu, args):
-    if args.distributed:
-        torch.multiprocessing.set_start_method("fork", force=True)
-    np.set_printoptions(formatter={"float": "{: 0.3f}".format}, suppress=True)
-    args.gpu = gpu
-    if args.distributed:
-        args.rank = args.rank * args.ngpus_per_node + gpu
-        dist.init_process_group(
-            backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank
-        )
-    torch.cuda.set_device(args.gpu)
-    torch.backends.cudnn.benchmark = True
-    args.test_mode = False
-    loader = get_loader(args)
-    print(args.rank, " gpu", args.gpu)
-    if args.rank == 0:
-        print("Batch size is:", args.batch_size, "epochs", args.max_epochs)
-    inf_size = [args.roi_x, args.roi_y, args.roi_z]
-    
-    dice_loss = DiceCELoss(
-        to_onehot_y=True, softmax=True, squared_pred=True, smooth_nr=args.smooth_nr, smooth_dr=args.smooth_dr
-    )
-    post_label = AsDiscrete(to_onehot=True, n_classes=args.out_channels)
-    post_pred = AsDiscrete(argmax=True, to_onehot=True, n_classes=args.out_channels)
-    dice_acc = DiceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
-    hd_acc = HausdorffDistanceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
-
-    args.checkpoint_filename_old = args.checkpoint_filename
-
-    hyper_params = {
-        'decode_mode': ['CA', 'simple'],
-        'cft_mode': ['channel', 'patch', 'all']
-    }
-    combinations = list(itertools.product(*hyper_params.values()))
-    output = {}
-    for count, c in enumerate(combinations):
-        if args.distributed:
-            torch.distributed.barrier()
-            
-        decode_mode = c[0]
-        cft_mode = c[1]
-        print(str(count+1) + "/" + str(len(combinations)) + " Training modes " + c[0] + " " + c[1])
-        args.checkpoint_filename = args.checkpoint_filename_old[:-3] + "_" + decode_mode + "_" + cft_mode + "_" + ".pt" 
-
-        if (args.model_name is None) or args.model_name == "unetmv":
-            model = UNETMV(
-                in_channels=args.in_channels,
-                out_channels=args.out_channels,
-                img_size=(args.roi_x, args.roi_y, args.roi_z),
-                patch_size=(args.patch_x, args.patch_y, args.patch_z),
-                feature_size=args.feature_size,
-                hidden_size=args.hidden_size,
-                mlp_dim=args.mlp_dim,
-                num_heads=args.num_heads,
-                norm_name=args.norm_name,
-                conv_block=True,
-                res_block=True,
-                dropout_rate=args.dropout_rate,
-                decode_mode=decode_mode,
-                cft_mode=cft_mode
-                )                
-        else:
-            raise ValueError("Unsupported model " + str(args.model_name))
-     
-        model_inferer = partial(
-            sliding_window_inference,
-            roi_size=inf_size,
-            sw_batch_size=args.sw_batch_size,
-            predictor=model,
-            overlap=args.infer_overlap,
-        )
-    
-        pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print("Total parameters count", pytorch_total_params)
-    
-        best_acc = 0
-        start_epoch = 0
  
-        model.cuda(args.gpu)
-    
-        if args.distributed:
-            torch.cuda.set_device(args.gpu)
-            if args.norm_name == "batch":
-                model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-            model.cuda(args.gpu)
-            model = torch.nn.parallel.DistributedDataParallel(
-                model, device_ids=[args.gpu], output_device=args.gpu, find_unused_parameters=True
-            )
-        if args.optim_name == "adam":
-            optimizer = torch.optim.Adam(model.parameters(), lr=args.optim_lr, weight_decay=args.reg_weight)
-        elif args.optim_name == "adamw":
-            optimizer = torch.optim.AdamW(model.parameters(), lr=args.optim_lr, weight_decay=args.reg_weight)
-        elif args.optim_name == "sgd":
-            optimizer = torch.optim.SGD(
-                model.parameters(), lr=args.optim_lr, momentum=args.momentum, nesterov=True, weight_decay=args.reg_weight
-            )
-        else:
-            raise ValueError("Unsupported Optimization Procedure: " + str(args.optim_name))
-    
-        if args.lrschedule == "warmup_cosine":
-            scheduler = LinearWarmupCosineAnnealingLR(
-                optimizer, warmup_epochs=args.warmup_epochs, max_epochs=args.max_epochs
-            )
-        elif args.lrschedule == "cosine_anneal":
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
-            if args.checkpoint is not None:
-                scheduler.step(epoch=start_epoch)
-        else:
-            scheduler = None
-        accuracy = run_training(
-            model=model,
-            train_loader=loader[0],
-            val_loader=loader[1],
-            optimizer=optimizer,
-            loss_func=dice_loss,
-            acc_func=dice_acc,
-            hd_func=hd_acc,
-            args=args,
-            model_inferer=model_inferer,
-            scheduler=scheduler,
-            start_epoch=start_epoch,
-            post_label=post_label,
-            post_pred=post_pred,
-        )
-        
-        output[c[0] + "_" + c[1]] = accuracy
-    output = list(sorted(output.items(), key=lambda item: item[1], reverse=True))
-    print("Best mode: " + str(output[0][0]))
-    print("Best acc: " + str(output[0][1]))
-    return output[0][1]
-
-
 def gpu_usage(args):
     print("___________________________________________________")
     print("gpu ")
