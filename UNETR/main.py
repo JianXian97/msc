@@ -118,6 +118,8 @@ def main():
     # args.model_name = "unetmv"
     # args.logdir = "./runs/" + args.logdir
     # args.tune = True
+    args.optuna = True
+    args.distributed = True
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
         print("Found total gpus", args.ngpus_per_node)
@@ -144,6 +146,8 @@ def optimise(args):
         
         args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.2))        
         lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
+        if args.distributed:            
+            lr_list = [x*args.ngpus_per_node for x in lr_list]
         args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,54,72,90])
         args.feature_size = trial.suggest_categorical("Model feature size, F", [4,8,12,16,20])
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
@@ -154,7 +158,6 @@ def optimise(args):
         for i in range(args.num_kfold): #k fold
             args.kfold_split = i #used while generating the loader
             if args.distributed:            
-                lr_list = [x*args.ngpus_per_node for x in lr_list]
                 args.optim_lr = trial.suggest_categorical("lr", lr_list)
                             
                 mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
