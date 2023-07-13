@@ -34,6 +34,7 @@ from monai.transforms import Activations, AsDiscrete, Compose
 from monai.utils.enums import MetricReduction
 
 import itertools
+import joblib
 
 import optuna
 from optuna.trial._state import TrialState
@@ -108,6 +109,7 @@ parser.add_argument("--smooth_dr", default=1e-6, type=float, help="constant adde
 parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added to dice numerator to avoid zero")
 parser.add_argument("--tune_mode", default=None, type=str, help="Tune mode, either 'archi' or 'EF'")
 parser.add_argument("--optuna", action="store_true", help="Run optuna, hyperparameter tuning")
+parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume optuna optimisation from file")
 
 
 def main():
@@ -118,8 +120,8 @@ def main():
     # args.model_name = "unetmv"
     # args.logdir = "./runs/" + args.logdir
     # args.tune = True
-    args.optuna = True
-    args.distributed = True
+    # args.optuna = True
+    # args.distributed = True
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
         print("Found total gpus", args.ngpus_per_node)
@@ -143,6 +145,7 @@ def main():
 
 def optimise(args):
     def objective(trial):
+        print("Trial Number " + str(trial.number))
         
         args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.2))        
         lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
@@ -152,7 +155,7 @@ def optimise(args):
         args.feature_size = trial.suggest_categorical("Model feature size, F", [4,8,12,16,20])
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
         args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
-        
+         
         accuracy = 0
      
         for i in range(args.num_kfold): #k fold
@@ -170,11 +173,19 @@ def optimise(args):
          
             gc.collect()
             torch.cuda.empty_cache()
-            
+        
+        path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
+        study.trials_dataframe().to_pickle(path)            
+        path = os.path.join(args.logdir, "OPTUNA study.pkl")
+        joblib.dump(study, path)     
+        
         return accuracy/args.num_kfold
 
-    
-    study = optuna.create_study(direction='maximize')
+    if args.optuna_load_dir is not None:
+        path = os.path.join(args.logdir, "OPTUNA study.pkl")
+        study = joblib.load(path)
+    else:
+        study = optuna.create_study(study_name="optimise 100G", direction='maximize')
     study.optimize(objective, n_trials=50)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
