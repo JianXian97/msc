@@ -79,6 +79,15 @@ def train_epoch(model, loader, optimizer, scaler, epoch, loss_func, args):
             run_loss.update(
                 np.mean(np.mean(np.stack(loss_list, axis=0), axis=0), axis=0), n=args.batch_size * args.world_size
             )
+            if np.isnan(run_loss.avg):
+                print("LOSS LIST")
+                print(loss_list)
+                print("LOGITS")
+                print(logits)
+                print("Targets")
+                print(target)
+
+                raise "Loss Error"
         else:
             run_loss.update(loss.item(), n=args.batch_size)
         if args.rank == 0:
