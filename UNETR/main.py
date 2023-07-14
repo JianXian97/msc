@@ -180,7 +180,8 @@ def optimise(args):
         joblib.dump(study, path)     
         
         return accuracy/args.num_kfold
-
+    
+    print("Running Optuna")
     if args.optuna_load_dir is not None:
         path = os.path.join(args.logdir, "OPTUNA study.pkl")
         study = joblib.load(path)
