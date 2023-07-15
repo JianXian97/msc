@@ -133,8 +133,6 @@ def main():
     assert not (args.tune_mode != None and args.optuna), "optuna and tune cannot be run simultaneously!"
     args.kfold = False
     if args.optuna:            
-        args.kfold = True
-        args.num_kfold = 5
         optimise(args)
     elif args.tune_mode != None:
         tune(args)
@@ -158,7 +156,7 @@ def optimise(args):
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
         args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
          
-        accuracy = 0  
+      
         if args.distributed:            
             args.optim_lr = trial.suggest_categorical("lr", lr_list)
             mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
@@ -168,7 +166,7 @@ def optimise(args):
         
         args.train_distributed = args.distributed
         args.distributed = False #dont use distributed testing
-        accuracy += test.test_model(args)
+        accuracy = test.test_model(args)
         args.distributed = args.train_distributed
         
         gc.collect()
@@ -179,7 +177,7 @@ def optimise(args):
         path = os.path.join(args.logdir, "OPTUNA study.pkl")
         joblib.dump(study, path)     
         
-        return accuracy/args.num_kfold
+        return accuracy
     
     print("Running Optuna")
     args.pretrained_dir = args.logdir #used while conducting tests
