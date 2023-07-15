@@ -21,7 +21,7 @@ import torch.multiprocessing as mp
 import torch.nn.parallel
 import torch.utils.data.distributed
 import torch.nn.functional as F
-import test.test_model as test_model
+import test
 from networks.unetr import UNETR
 from networks.unetmv import UNETMV
 from optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
@@ -168,7 +168,7 @@ def optimise(args):
         
         args.train_distributed = args.distributed
         args.distributed = False #dont use distributed testing
-        accuracy += test_model(args)
+        accuracy += test.test_model(args)
         args.distributed = args.train_distributed
         
         gc.collect()
