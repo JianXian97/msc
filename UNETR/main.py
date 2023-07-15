@@ -21,10 +21,10 @@ import torch.multiprocessing as mp
 import torch.nn.parallel
 import torch.utils.data.distributed
 import torch.nn.functional as F
+import test.test_model as test_model
 from networks.unetr import UNETR
 from networks.unetmv import UNETMV
 from optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
-from .test import test_model
 from trainer import run_training
 from utils.data_utils import get_loader
 
