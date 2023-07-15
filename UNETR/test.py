@@ -164,6 +164,80 @@ def main():
         print("Overall Mean Dice: {}".format(np.mean(dice_list_case)))
         print("Overall Organ 95HD: {}".format(["%0.2f" % i for i in np.nanmean(hd_list_case_org, axis = 0)]))
         print("Overall Mean 95HD: {}".format(np.nanmean(hd_list_case)))
+        
+
+def test_model(args):
+    args.test_mode = True
+    val_loader = get_loader(args)
+    pretrained_dir = args.pretrained_dir
+    pretrained_model_name = args.pretrained_model_name
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # pretrained_pth = os.path.join(pretrained_dir, pretrained_model_name)
+    pretrained_pth = pretrained_dir.strip('\'') + pretrained_model_name
+  
+    model = UNETMV(
+        in_channels=args.in_channels,
+        out_channels=args.out_channels,
+        img_size=(args.roi_x, args.roi_y, args.roi_z),
+        feature_size=args.feature_size,
+        hidden_size=args.hidden_size,
+        mlp_dim=args.mlp_dim,
+        num_heads=args.num_heads,
+        norm_name=args.norm_name,
+        conv_block=True,
+        res_block=True,
+        dropout_rate=args.dropout_rate,
+        decode_mode=args.decode_mode,
+        cft_mode=args.cft_mode   
+    )
+    model_dict = torch.load(pretrained_pth)
+    try:
+        model.load_state_dict(model_dict)
+    except:
+        model.load_state_dict(model_dict["state_dict"])
+    model.eval()
+    model.to(device)
+
+    with torch.no_grad():
+        dice_list_case = []
+        dice_list_case_org = []
+        hd_list_case = []
+        hd_list_case_org = []
+        for i, batch in enumerate(val_loader):
+            val_inputs, val_labels = (batch["image"].cuda(), batch["label"].cuda())
+            img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
+            print("Inference on case {}".format(img_name))
+            val_outputs = sliding_window_inference(val_inputs, (args.roi_x, args.roi_y, args.roi_z), 4, model, overlap=args.infer_overlap)
+            val_outputs = torch.softmax(val_outputs, 1).cpu().numpy()
+            val_outputs = np.argmax(val_outputs, axis=1).astype(np.uint8)
+            val_labels = val_labels.cpu().numpy()[:, 0, :, :, :]
+            val_inputs = val_inputs.cpu().numpy()[:, 0, :, :, :]
+            dice_list_sub = []
+            hd_list_sub = []
+  
+            for i in range(1, args.out_channels):
+                organ_Dice = dice(val_outputs[0] == i, val_labels[0] == i)
+                hd = compute_hausdorff_distance(np.expand_dims(val_outputs, 0) == i, np.expand_dims(val_labels, 0) == i, percentile=95)[0][0]
+                dice_list_sub.append(organ_Dice)
+                hd_list_sub.append(hd)
+                    
+            mean_dice = np.mean(dice_list_sub)
+            mean_hd = np.nanmean(hd_list_sub)
+            dice_list_case_org.append(dice_list_sub)
+            hd_list_case_org.append(hd_list_sub)
+            print("Organ Dice: {}".format(["%0.2f" % i for i in dice_list_sub]))
+            print("Mean Organ Dice: {}".format(mean_dice))            
+            print("Organ 95HD: {}".format(["%0.2f" % i for i in hd_list_sub]))
+            print("Mean 95HD: {}".format(mean_hd))
+            dice_list_case.append(mean_dice)
+            hd_list_case.append(mean_hd)
+
+        print("Overall Organ Dice: {}".format(["%0.2f" % i for i in np.mean(dice_list_case_org, axis = 0)]))
+        print("Overall Mean Dice: {}".format(np.mean(dice_list_case)))
+        print("Overall Organ 95HD: {}".format(["%0.2f" % i for i in np.nanmean(hd_list_case_org, axis = 0)]))
+        print("Overall Mean 95HD: {}".format(np.nanmean(hd_list_case)))
+    
+    return np.mean(dice_list_case)
 
 
 if __name__ == "__main__":

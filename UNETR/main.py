@@ -24,6 +24,7 @@ import torch.nn.functional as F
 from networks.unetr import UNETR
 from networks.unetmv import UNETMV
 from optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
+from .test import test_model
 from trainer import run_training
 from utils.data_utils import get_loader
 
@@ -146,8 +147,9 @@ def main():
 def optimise(args):
     def objective(trial):
         print("Trial Number " + str(trial.number))
+        args.test_mode = False
         
-        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.2))        
+        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.1))        
         lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
         if args.distributed:            
             lr_list = [x*args.ngpus_per_node for x in lr_list]
@@ -156,23 +158,21 @@ def optimise(args):
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
         args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
          
-        accuracy = 0
-     
-        for i in range(args.num_kfold): #k fold
-            args.kfold_split = i #used while generating the loader
-            if args.distributed:            
-                args.optim_lr = trial.suggest_categorical("lr", lr_list)
-                            
-                mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
-                
-                accuracy = args.q.get()
-            
-            else:
-                args.optim_lr = trial.suggest_categorical("lr", lr_list)
-                accuracy += main_worker(gpu=0, args=args)
-         
-            gc.collect()
-            torch.cuda.empty_cache()
+        accuracy = 0  
+        if args.distributed:            
+            args.optim_lr = trial.suggest_categorical("lr", lr_list)
+            mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
+        
+        else:
+            args.optim_lr = trial.suggest_categorical("lr", lr_list)
+        
+        args.train_distributed = args.distributed
+        args.distributed = False #dont use distributed testing
+        accuracy += test_model(args)
+        args.distributed = args.train_distributed
+        
+        gc.collect()
+        torch.cuda.empty_cache()
         
         path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
         study.trials_dataframe().to_pickle(path)            
@@ -182,6 +182,8 @@ def optimise(args):
         return accuracy/args.num_kfold
     
     print("Running Optuna")
+    args.pretrained_dir = args.logdir #used while conducting tests
+    args.pretrained_model_name = "model.pt" #used while conducting tests
     if args.optuna_load_dir is not None:
         path = os.path.join(args.logdir, "OPTUNA study.pkl")
         study = joblib.load(path)
