@@ -77,8 +77,8 @@ def main():
     pretrained_dir = args.pretrained_dir
     pretrained_model_name = args.pretrained_model_name
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # pretrained_pth = os.path.join(pretrained_dir, pretrained_model_name)
-    pretrained_pth = pretrained_dir.strip('\'') + pretrained_model_name
+    pretrained_pth = os.path.join(pretrained_dir, pretrained_model_name)
+    # pretrained_pth = pretrained_dir.strip('\'') + pretrained_model_name
     if args.saved_checkpoint == "torchscript":
         model = torch.jit.load(pretrained_pth)
     elif args.saved_checkpoint == "ckpt":
