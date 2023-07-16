@@ -87,7 +87,7 @@ def train_epoch(model, loader, optimizer, scaler, epoch, loss_func, args):
                 print("Targets")
                 print(target)
 
-                raise "Loss Error"
+                raise ValueError('Invalid loss value')
         else:
             run_loss.update(loss.item(), n=args.batch_size)
         if args.rank == 0:
