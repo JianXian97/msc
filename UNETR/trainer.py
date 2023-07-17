@@ -79,6 +79,7 @@ def train_epoch(model, loader, optimizer, scaler, epoch, loss_func, args):
             run_loss.update(
                 np.mean(np.mean(np.stack(loss_list, axis=0), axis=0), axis=0), n=args.batch_size * args.world_size
             )
+            ''' Bayesian Opt may select bad hyper params that causes the model to output Nan
             if np.isnan(run_loss.avg):
                 print("LOSS LIST")
                 print(loss_list)
@@ -88,6 +89,7 @@ def train_epoch(model, loader, optimizer, scaler, epoch, loss_func, args):
                 print(target)
 
                 raise ValueError('Invalid loss value')
+            '''
         else:
             run_loss.update(loss.item(), n=args.batch_size)
         if args.rank == 0:

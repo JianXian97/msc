@@ -148,7 +148,7 @@ def optimise(args):
         args.test_mode = False
         
         args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.1))        
-        lr_list = [1e-6,1e-5,1e-4,1e-3,1e-2]
+        lr_list = [1e-6,1e-5,1e-4,1e-3]
         if args.distributed:            
             lr_list = [x*args.ngpus_per_node for x in lr_list]
         args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,54,72,90])
@@ -443,19 +443,7 @@ def tune(args):
     print("Best config: " + str(output[0][0]))
     print("Best acc: " + str(output[0][1]))
     return output[0][1] 
-
  
-def gpu_usage(args):
-    print("___________________________________________________")
-    print("gpu ")
-    print(torch.cuda.mem_get_info())
-    print("___________________________________________________")
-    # for i in range(args.ngpus_per_node):
-    #     print("___________________________________________________")
-    #     print("gpu " + str(i) + ": ", end="")
-    #     print(torch.cuda.mem_get_info(i))
-    #     print("___________________________________________________")
-
         
 if __name__ == "__main__":
     main()
