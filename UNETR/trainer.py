@@ -267,5 +267,6 @@ def run_training(
             scheduler.step()
 
     print("Training Finished !, Best Accuracy: ", val_acc_max)
-
+    if args.distributed:
+        torch.distributed.barrier()
     return val_acc_max

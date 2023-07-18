@@ -362,9 +362,9 @@ def main_worker(gpu, args):
         post_pred=post_pred,
     )
     
-    if args.optuna or args.tune_mode != None: #store output in a queue
+    # if args.optuna or args.tune_mode != None: #store output in a queue
         # accuracy.share_memory_()
-        args.q.put(accuracy)
+        # args.q.put(accuracy)
     
     del model
     gc.collect()
