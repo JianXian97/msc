@@ -183,7 +183,7 @@ def optimise(args):
     args.pretrained_dir = args.logdir #used while conducting tests
     args.pretrained_model_name = "model.pt" #used while conducting tests
     if args.optuna_load_dir is not None:
-        path = os.path.join(args.logdir, "OPTUNA study.pkl")
+        path = os.path.join(args.optuna_load_dir, "OPTUNA study.pkl")
         study = joblib.load(path)
     else:
         study = optuna.create_study(study_name="optimise 100G", direction='maximize')
