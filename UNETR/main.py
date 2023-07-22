@@ -185,6 +185,7 @@ def optimise(args):
     if args.optuna_load_dir is not None:
         path = os.path.join(args.optuna_load_dir, "OPTUNA study.pkl")
         study = joblib.load(path)
+        print("loaded optuna study")
     else:
         study = optuna.create_study(study_name="optimise 100G", direction='maximize')
     study.optimize(objective, n_trials=50)
