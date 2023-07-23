@@ -95,7 +95,7 @@ class MobileVitBlock(nn.Module):
         #fusion layer, combine transformer output with input patch using 1x1x1 conv
         self.fusion_layer = Convolution(
                 self.dimensions,
-                2 * in_channels,
+                2 * in_channels + transformer_dim,
                 out_channels,
                 strides=strides,
                 kernel_size=kernel_sizes[-1],
@@ -225,12 +225,12 @@ class MobileVitBlock(nn.Module):
         return x
         
         
-    def fusion(self, img, x):
+    def fusion(self, img, x_local, x):
         '''
         This function is used to combine the transformer output with the input patch.
         '''
         x = self.conv_proj(x)
-        x = torch.cat([img, x], dim=1)
+        x = torch.cat([img, x_local, x], dim=1)
         x = self.fusion_layer(x)
 
         return x
@@ -238,6 +238,7 @@ class MobileVitBlock(nn.Module):
     def forward(self, x):
         res = x       
         x = self.local_rep(x)
+        res_local = x
         x = unfold_proj(x, self.patch_size, self.unfold_proj_layer)
         torch.cuda.empty_cache()
         # for transformer_layer in self.transformers:
@@ -246,7 +247,7 @@ class MobileVitBlock(nn.Module):
           
         torch.cuda.empty_cache()
         x = fold_proj(x, self.img_size, self.patch_size, self.fold_proj_layer, self.transformer_dim)
-        x = self.fusion(res, x)
+        x = self.fusion(res, res_local, x)
         return x
  
     
