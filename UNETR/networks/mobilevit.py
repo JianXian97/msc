@@ -92,10 +92,27 @@ class MobileVitBlock(nn.Module):
                 padding=paddings[-1],
             ) 
         
+        self.conv_proj_local = Convolution(
+                self.dimensions,
+                transformer_dim,
+                in_channels,
+                strides=strides,
+                kernel_size=kernel_sizes[-1],
+                adn_ordering="ADN",
+                act=act_name,
+                norm=norm_name,
+                dropout=dropout_rate,
+                dropout_dim=1,
+                dilation=1,
+                bias=True,
+                conv_only=False,
+                padding=paddings[-1],
+            ) 
+        
         #fusion layer, combine transformer output with input patch using 1x1x1 conv
         self.fusion_layer = Convolution(
                 self.dimensions,
-                2 * in_channels + transformer_dim,
+                3 * in_channels,
                 out_channels,
                 strides=strides,
                 kernel_size=kernel_sizes[-1],
@@ -230,6 +247,7 @@ class MobileVitBlock(nn.Module):
         This function is used to combine the transformer output with the input patch.
         '''
         x = self.conv_proj(x)
+        x_local = self.conv_proj_local(x_local)
         x = torch.cat([img, x_local, x], dim=1)
         x = self.fusion_layer(x)
 
