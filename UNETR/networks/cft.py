@@ -22,7 +22,6 @@ class CFT(MobileVitBlock):
         dropout_rate: float = 0,
         norm_name: Union[Tuple, str] = "instance",
         act_name: Union[Tuple, str] = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
-        groups: int = 1,
         #transformer params
         transformer_dim: int = 144,
         hidden_dim: int = 576,
@@ -35,7 +34,7 @@ class CFT(MobileVitBlock):
         out_channels: int = 16,        
         mode: str = "channel"
     )->None : 
-        super().__init__(in_channels, strides, dropout_rate, norm_name, act_name, groups, transformer_dim, hidden_dim, num_heads, num_layers, img_size, patch_size, out_channels)
+        super().__init__(in_channels, strides, dropout_rate, norm_name, act_name, transformer_dim, hidden_dim, num_heads, num_layers, img_size, patch_size, out_channels)
         
         if mode not in ['channel', 'patch', 'all']:
             raise AssertionError("cft mode should be one of the following: 'channel', 'patch', 'all'.")
