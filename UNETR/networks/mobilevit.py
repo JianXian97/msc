@@ -29,6 +29,7 @@ class MobileVitBlock(nn.Module):
         dropout_rate: float = 0,
         norm_name: Union[Tuple, str] = "instance",
         act_name: Union[Tuple, str] = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
+        groups: int = 1,
         #transformer params
         transformer_dim: int = 144,
         hidden_dim: int = 576,
@@ -69,6 +70,7 @@ class MobileVitBlock(nn.Module):
                 bias=True,
                 conv_only=False,
                 padding=paddings[i],
+                groups=groups,
             )
             if i == num_local_conv_layers - 2:
                 local_out_channels = transformer_dim
@@ -91,28 +93,11 @@ class MobileVitBlock(nn.Module):
                 conv_only=False,
                 padding=paddings[-1],
             ) 
-        
-        self.conv_proj_local = Convolution(
-                self.dimensions,
-                transformer_dim,
-                in_channels,
-                strides=strides,
-                kernel_size=kernel_sizes[-1],
-                adn_ordering="ADN",
-                act=act_name,
-                norm=norm_name,
-                dropout=dropout_rate,
-                dropout_dim=1,
-                dilation=1,
-                bias=True,
-                conv_only=False,
-                padding=paddings[-1],
-            ) 
-        
+ 
         #fusion layer, combine transformer output with input patch using 1x1x1 conv
         self.fusion_layer = Convolution(
                 self.dimensions,
-                3 * in_channels,
+                2 * in_channels + transformer_dim,
                 out_channels,
                 strides=strides,
                 kernel_size=kernel_sizes[-1],
@@ -247,7 +232,6 @@ class MobileVitBlock(nn.Module):
         This function is used to combine the transformer output with the input patch.
         '''
         x = self.conv_proj(x)
-        x_local = self.conv_proj_local(x_local)
         x = torch.cat([img, x_local, x], dim=1)
         x = self.fusion_layer(x)
 

@@ -162,6 +162,7 @@ class UNETMV(nn.Module):
                 in_channels = feature_size * (2 ** i),
                 dropout_rate = dropout_rate,
                 norm_name = norm_name,
+                groups = feature_size, #all mobilevit blocks uses the same number of groups
                 #transformer params
                 transformer_dim = hidden_size,
                 hidden_dim = mlp_dim,
