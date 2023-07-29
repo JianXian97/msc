@@ -91,24 +91,7 @@ class MobileVitBlock(nn.Module):
                 conv_only=False,
                 padding=paddings[-1],
             ) 
-        
-        self.conv_proj_img = Convolution(
-                self.dimensions,
-                in_channels,
-                transformer_dim,
-                strides=strides,
-                kernel_size=kernel_sizes[-1],
-                adn_ordering="ADN",
-                act=act_name,
-                norm=norm_name,
-                dropout=dropout_rate,
-                dropout_dim=1,
-                dilation=1,
-                bias=True,
-                conv_only=False,
-                padding=paddings[-1],
-            ) 
-        
+           
         #fusion layer, combine transformer output with input patch using 1x1x1 conv
         self.fusion_layer = Convolution(
                 self.dimensions,
@@ -254,7 +237,7 @@ class MobileVitBlock(nn.Module):
         
     def forward(self, x):
         res = x       
-        x = self.local_rep(x) + self.conv_proj_img(res)
+        x = self.local_rep(x)  
         res_local = x
         x = unfold_proj(x, self.patch_size, self.unfold_proj_layer)
         torch.cuda.empty_cache()
