@@ -112,6 +112,8 @@ parser.add_argument("--tune_mode", default=None, type=str, help="Tune mode, eith
 parser.add_argument("--optuna", action="store_true", help="Run optuna, hyperparameter tuning")
 parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume optuna optimisation from file")
 parser.add_argument("--optuna_hpc", action="store_true", help="Run optuna, hyperparameter tuning on HPC")
+parser.add_argument("--optuna_expt_file_name", default="OPTUNA Expt Results.pkl", type=str, help="File name of optuna experimental results.")
+parser.add_argument("--optuna_study_file_name", default="OPTUNA study.pkl", type=str, help="File name of optuna study.")
 
 
 def main():
@@ -177,9 +179,9 @@ def optimise(args):
         gc.collect()
         torch.cuda.empty_cache()
         
-        path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
+        path = os.path.join(args.logdir, args.optuna_file_name)
         study.trials_dataframe().to_pickle(path)            
-        path = os.path.join(args.logdir, "OPTUNA study.pkl")
+        path = os.path.join(args.logdir, args.optuna_study_file_name)
         joblib.dump(study, path)     
         
         return accuracy
@@ -188,11 +190,17 @@ def optimise(args):
     args.pretrained_dir = args.logdir #used while conducting tests
     args.pretrained_model_name = "model.pt" #used while conducting tests
     if args.optuna_load_dir is not None:
-        path = os.path.join(args.optuna_load_dir, "OPTUNA study.pkl")
-        study = joblib.load(path)
-        print("loaded optuna study")
+        path = os.path.join(args.optuna_load_dir, args.optuna_study_file_name)
+        try:
+            study = joblib.load(path)
+            print("loaded optuna study")
+        except:
+            study = optuna.create_study(study_name="optimise 100G", direction='maximize')
+            print("Created optuna study!")
     else:
         study = optuna.create_study(study_name="optimise 100G", direction='maximize')
+        print("Created optuna study")
+        
     study.optimize(objective, n_trials=50, gc_after_trial=True)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
