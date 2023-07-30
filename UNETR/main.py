@@ -488,20 +488,21 @@ def main_worker_optimise(gpu, args):
         gc.collect()
         torch.cuda.empty_cache()
         
-        args.train_distributed = args.distributed
-        args.distributed = False #dont use distributed testing
-        accuracy = test.test_model(args)
-        args.distributed = args.train_distributed
-        
-        gc.collect()
-        torch.cuda.empty_cache()
-        
-        path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
-        study.trials_dataframe().to_pickle(path)            
-        path = os.path.join(args.logdir, "OPTUNA study.pkl")
-        joblib.dump(study, path) 
-        
-        return accuracy
+        if args.rank == 0:
+            args.train_distributed = args.distributed
+            args.distributed = False #dont use distributed testing
+            accuracy = test.test_model(args)
+            args.distributed = args.train_distributed
+            
+            gc.collect()
+            torch.cuda.empty_cache()
+            
+            path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
+            study.trials_dataframe().to_pickle(path)            
+            path = os.path.join(args.logdir, "OPTUNA study.pkl")
+            joblib.dump(study, path) 
+            
+            return accuracy
     
     if args.distributed:
         torch.multiprocessing.set_start_method("fork", force=True)
@@ -552,11 +553,11 @@ def main_worker_optimise(gpu, args):
     else:
         for i in range(50):
             while(len(args.shared_list) == 0):
-                time.sleep(1)
+                time.sleep(0.1)
                 
             trial = args.shared_list[-1]
             while(trial.number < i):
-                time.sleep(1)
+                time.sleep(0.1)
                 trial = args.shared_list[-1]
             
             objective(trial)
