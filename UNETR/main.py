@@ -111,6 +111,7 @@ parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added
 parser.add_argument("--tune_mode", default=None, type=str, help="Tune mode, either 'archi' or 'EF'")
 parser.add_argument("--optuna", action="store_true", help="Run optuna, hyperparameter tuning")
 parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume optuna optimisation from file")
+parser.add_argument("--optuna_hpc", action="store_true", help="Run optuna, hyperparameter tuning on HPC")
 
 
 def main():
@@ -128,12 +129,16 @@ def main():
         print("Found total gpus", args.ngpus_per_node)
         args.world_size = args.ngpus_per_node * args.world_size
         manager = mp.Manager()
-        args.q = manager.Queue()
+        args.shared_list = manager.list()
                 
     assert not (args.tune_mode != None and args.optuna), "optuna and tune cannot be run simultaneously!"
+    assert not (args.tune_mode != None and args.optuna_hpc), "optuna and tune cannot be run simultaneously!"
+    assert not (args.optuna and args.optuna_hpc), "optuna and optuna_hpc cannot be run simultaneously"
     args.kfold = False
-    if args.optuna:            
+    if args.optuna:    
         optimise(args)
+    elif args.optuna_hpc:
+        mp.spawn(main_worker_optimise, nprocs=args.ngpus_per_node, args=(args,))
     elif args.tune_mode != None:
         tune(args)
     else:            
@@ -188,7 +193,7 @@ def optimise(args):
         print("loaded optuna study")
     else:
         study = optuna.create_study(study_name="optimise 100G", direction='maximize')
-    study.optimize(objective, n_trials=50)
+    study.optimize(objective, n_trials=50, gc_after_trial=True)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -375,6 +380,188 @@ def main_worker(gpu, args):
 
     return accuracy
 
+import time 
+def main_worker_optimise(gpu, args):
+    def objective(trial):
+        if args.rank == 0:
+            args.shared_list.append(trial)
+        print("Trial Number " + str(trial.number))
+        args.test_mode = False
+        
+        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.1))        
+        lr_list = [1e-6,1e-5,1e-4,1e-3]
+        if args.distributed:            
+            lr_list = [x*args.ngpus_per_node for x in lr_list]
+        args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,54,72,90])
+        args.feature_size = trial.suggest_categorical("Model feature size, F", [4,8,12,16,20])
+        args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
+        args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
+        
+        model = UNETMV(
+            in_channels=args.in_channels,
+            out_channels=args.out_channels,
+            img_size=(args.roi_x, args.roi_y, args.roi_z),
+            patch_size=(args.patch_x, args.patch_y, args.patch_z),
+            feature_size=args.feature_size,
+            hidden_size=args.hidden_size,
+            mlp_dim=args.mlp_dim,
+            num_heads=args.num_heads,
+            norm_name=args.norm_name,
+            conv_block=True,
+            res_block=True,
+            dropout_rate=args.dropout_rate,
+            decode_mode=args.decode_mode,
+            cft_mode=args.cft_mode                
+        )
+     
+        dice_loss = DiceCELoss(
+            to_onehot_y=True, softmax=True, squared_pred=True, smooth_nr=args.smooth_nr, smooth_dr=args.smooth_dr
+        )
+        post_label = AsDiscrete(to_onehot=True, n_classes=args.out_channels)
+        post_pred = AsDiscrete(argmax=True, to_onehot=True, n_classes=args.out_channels)
+        dice_acc = DiceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True)
+        hd_acc = HausdorffDistanceMetric(include_background=True, reduction=MetricReduction.MEAN, get_not_nans=True, percentile=95)
+        
+        model_inferer = partial(
+            sliding_window_inference,
+            roi_size=inf_size,
+            sw_batch_size=args.sw_batch_size,
+            predictor=model,
+            overlap=args.infer_overlap,
+        )
+    
+        pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print("Total parameters count", pytorch_total_params)
+    
+        start_epoch = 0
+        model.cuda(args.gpu)
+        if args.distributed:
+            torch.cuda.set_device(args.gpu)
+            if args.norm_name == "batch":
+                model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            model.cuda(args.gpu)
+            model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[args.gpu], output_device=args.gpu, find_unused_parameters=True
+            )
+        if args.optim_name == "adam":
+            optimizer = torch.optim.Adam(model.parameters(), lr=args.optim_lr, weight_decay=args.reg_weight)
+        elif args.optim_name == "adamw":
+            optimizer = torch.optim.AdamW(model.parameters(), lr=args.optim_lr, weight_decay=args.reg_weight)
+        elif args.optim_name == "rmsprop":
+            optimizer = torch.optim.RMSprop(
+                model.parameters(), lr=args.optim_lr, weight_decay=args.reg_weight, momentum=args.momentum
+            )
+        elif args.optim_name == "sgd":
+            optimizer = torch.optim.SGD(
+                model.parameters(), lr=args.optim_lr, momentum=args.momentum, nesterov=True, weight_decay=args.reg_weight
+            )
+        else:
+            raise ValueError("Unsupported Optimization Procedure: " + str(args.optim_name))
+    
+        if args.lrschedule == "warmup_cosine":
+            scheduler = LinearWarmupCosineAnnealingLR(
+                optimizer, warmup_epochs=args.warmup_epochs, max_epochs=args.max_epochs
+            )
+        elif args.lrschedule == "cosine_anneal":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
+            if args.checkpoint is not None:
+                scheduler.step(epoch=start_epoch)
+        else:
+            scheduler = None
+        accuracy = run_training(
+            model=model,
+            train_loader=loader[0],
+            val_loader=loader[1],
+            optimizer=optimizer,
+            loss_func=dice_loss,
+            acc_func=dice_acc,
+            hd_func=hd_acc,
+            args=args,
+            model_inferer=model_inferer,
+            scheduler=scheduler,
+            start_epoch=start_epoch,
+            post_label=post_label,
+            post_pred=post_pred,
+        )
+        
+        del model
+        gc.collect()
+        torch.cuda.empty_cache()
+        
+        args.train_distributed = args.distributed
+        args.distributed = False #dont use distributed testing
+        accuracy = test.test_model(args)
+        args.distributed = args.train_distributed
+        
+        gc.collect()
+        torch.cuda.empty_cache()
+        
+        path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
+        study.trials_dataframe().to_pickle(path)            
+        path = os.path.join(args.logdir, "OPTUNA study.pkl")
+        joblib.dump(study, path) 
+        
+        return accuracy
+    
+    if args.distributed:
+        torch.multiprocessing.set_start_method("fork", force=True)
+    np.set_printoptions(formatter={"float": "{: 0.3f}".format}, suppress=True)
+    args.gpu = gpu
+    if args.distributed:
+        args.rank = args.rank * args.ngpus_per_node + gpu
+        dist.init_process_group(
+            backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank
+        )
+    torch.cuda.set_device(args.gpu)
+    torch.backends.cudnn.benchmark = True
+    args.test_mode = False
+    loader = get_loader(args)
+    inf_size = [args.roi_x, args.roi_y, args.roi_z]  
+    print(args.rank, " gpu", args.gpu)
+    if args.rank == 0:
+        print("Batch size is:", args.batch_size, "epochs", args.max_epochs)   
+        print("Running Optuna")
+        args.pretrained_dir = args.logdir #used while conducting tests
+        args.pretrained_model_name = "model.pt" #used while conducting tests
+        if args.optuna_load_dir is not None:
+            path = os.path.join(args.optuna_load_dir, "OPTUNA study.pkl")
+            study = joblib.load(path)
+            print("loaded optuna study")
+        else:
+            study = optuna.create_study(study_name="optimise 100G", direction='maximize')
+        study.optimize(objective, n_trials=50)
+        pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
+        complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+
+        print("Study statistics: ")
+        print("  Number of finished trials: ", len(study.trials))
+        print("  Number of pruned trials: ", len(pruned_trials))
+        print("  Number of complete trials: ", len(complete_trials))
+    
+        print("Best trial:")
+        trial = study.best_trial
+    
+        print("  Value: ", trial.value)
+    
+        print("  Params: ")
+        for key, value in trial.params.items():
+            print("    {}: {}".format(key, value))
+        
+        path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
+        study.trials_dataframe().to_pickle(path)
+    else:
+        for i in range(50):
+            while(len(args.shared_list) == 0):
+                time.sleep(1)
+                
+            trial = args.shared_list[-1]
+            while(trial.number < i):
+                time.sleep(1)
+                trial = args.shared_list[-1]
+            
+            objective(trial)
+   
+    
 
 def tune(args):
     output = {}
