@@ -179,7 +179,7 @@ def optimise(args):
         gc.collect()
         torch.cuda.empty_cache()
         
-        path = os.path.join(args.logdir, args.optuna_file_name)
+        path = os.path.join(args.logdir, args.optuna_expt_file_name)
         study.trials_dataframe().to_pickle(path)            
         path = os.path.join(args.logdir, args.optuna_study_file_name)
         joblib.dump(study, path)     
