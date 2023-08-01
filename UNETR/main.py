@@ -391,8 +391,12 @@ def main_worker(gpu, args):
 import time 
 def main_worker_optimise(gpu, args):
     def objective(trial):
-        if args.rank == 0:
-            args.shared_list.append(trial)
+        # if args.rank == 0:
+        #     args.shared_list.append(trial)
+        objs = [trial]
+        dist.broadcast_object_list(objs, src=0) #blocking call
+        trial = objs[0]
+        
         print("Trial Number " + str(trial.number))
         args.test_mode = False
         
@@ -527,6 +531,7 @@ def main_worker_optimise(gpu, args):
     loader = get_loader(args)
     inf_size = [args.roi_x, args.roi_y, args.roi_z]  
     print(args.rank, " gpu", args.gpu)
+    n_trials = 50
     if args.rank == 0:
         print("Batch size is:", args.batch_size, "epochs", args.max_epochs)   
         print("Running Optuna")
@@ -538,7 +543,7 @@ def main_worker_optimise(gpu, args):
             print("loaded optuna study")
         else:
             study = optuna.create_study(study_name="optimise 100G", direction='maximize')
-        study.optimize(objective, n_trials=50)
+        study.optimize(objective, n_trials=n_trials)
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
         complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -559,16 +564,16 @@ def main_worker_optimise(gpu, args):
         path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
         study.trials_dataframe().to_pickle(path)
     else:
-        for i in range(50):
-            while(len(args.shared_list) == 0):
-                time.sleep(0.1)
+        for i in range(n_trials):
+            # while(len(args.shared_list) == 0):
+            #     time.sleep(0.1)
                 
-            trial = args.shared_list[-1]
-            while(trial.number < i):
-                time.sleep(0.1)
-                trial = args.shared_list[-1]
-            
-            objective(trial)
+            # trial = args.shared_list[-1]
+            # while(trial.number < i):
+            #     time.sleep(0.1)
+            #     trial = args.shared_list[-1]
+            trial = None #this will be updated using broadcast 
+            objective(trial) 
    
     
 
