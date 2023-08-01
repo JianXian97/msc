@@ -538,11 +538,16 @@ def main_worker_optimise(gpu, args):
         args.pretrained_dir = args.logdir #used while conducting tests
         args.pretrained_model_name = "model.pt" #used while conducting tests
         if args.optuna_load_dir is not None:
-            path = os.path.join(args.optuna_load_dir, "OPTUNA study.pkl")
-            study = joblib.load(path)
-            print("loaded optuna study")
+            path = os.path.join(args.optuna_load_dir, args.optuna_study_file_name)
+            try:
+                study = joblib.load(path)
+                print("loaded optuna study")
+            except:
+                study = optuna.create_study(study_name="optimise 100G", direction='maximize')
+                print("Created optuna study!")
         else:
             study = optuna.create_study(study_name="optimise 100G", direction='maximize')
+            print("Created optuna study")
         study.optimize(objective, n_trials=n_trials)
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
         complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
