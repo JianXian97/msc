@@ -166,35 +166,35 @@ def main():
         print("Overall Mean 95HD: {}".format(np.nanmean(hd_list_case)))
         
 
-def test_model(args):
+def test_model(args, model):
     args.test_mode = True
     val_loader = get_loader(args)
-    pretrained_dir = args.pretrained_dir
-    pretrained_model_name = args.pretrained_model_name
+    # pretrained_dir = args.pretrained_dir
+    # pretrained_model_name = args.pretrained_model_name
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    pretrained_pth = os.path.join(pretrained_dir, pretrained_model_name)
+    # pretrained_pth = os.path.join(pretrained_dir, pretrained_model_name)
     # pretrained_pth = pretrained_dir.strip('\'') + pretrained_model_name
   
-    model = UNETMV(
-        in_channels=args.in_channels,
-        out_channels=args.out_channels,
-        img_size=(args.roi_x, args.roi_y, args.roi_z),
-        feature_size=args.feature_size,
-        hidden_size=args.hidden_size,
-        mlp_dim=args.mlp_dim,
-        num_heads=args.num_heads,
-        norm_name=args.norm_name,
-        conv_block=True,
-        res_block=True,
-        dropout_rate=args.dropout_rate,
-        decode_mode=args.decode_mode,
-        cft_mode=args.cft_mode   
-    )
-    model_dict = torch.load(pretrained_pth)
-    try:
-        model.load_state_dict(model_dict)
-    except:
-        model.load_state_dict(model_dict["state_dict"])
+    # model = UNETMV(
+    #     in_channels=args.in_channels,
+    #     out_channels=args.out_channels,
+    #     img_size=(args.roi_x, args.roi_y, args.roi_z),
+    #     feature_size=args.feature_size,
+    #     hidden_size=args.hidden_size,
+    #     mlp_dim=args.mlp_dim,
+    #     num_heads=args.num_heads,
+    #     norm_name=args.norm_name,
+    #     conv_block=True,
+    #     res_block=True,
+    #     dropout_rate=args.dropout_rate,
+    #     decode_mode=args.decode_mode,
+    #     cft_mode=args.cft_mode   
+    # )
+    # model_dict = torch.load(pretrained_pth)
+    # try:
+    #     model.load_state_dict(model_dict)
+    # except:
+    #     model.load_state_dict(model_dict["state_dict"])
     model.eval()
     model.to(device)
 

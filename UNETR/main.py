@@ -111,7 +111,7 @@ parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added
 parser.add_argument("--tune_mode", default=None, type=str, help="Tune mode, either 'archi' or 'EF'")
 parser.add_argument("--optuna", action="store_true", help="Run optuna, hyperparameter tuning")
 parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume optuna optimisation from file")
-parser.add_argument("--optuna_hpc", action="store_true", help="Run optuna, hyperparameter tuning on HPC")
+# parser.add_argument("--optuna_hpc", action="store_true", help="Run optuna, hyperparameter tuning on HPC")
 parser.add_argument("--optuna_expt_file_name", default="OPTUNA Expt Results.pkl", type=str, help="File name of optuna experimental results.")
 parser.add_argument("--optuna_study_file_name", default="OPTUNA study.pkl", type=str, help="File name of optuna study.")
 
@@ -134,12 +134,12 @@ def main():
         args.shared_list = manager.list()
                 
     assert not (args.tune_mode != None and args.optuna), "optuna and tune cannot be run simultaneously!"
-    assert not (args.tune_mode != None and args.optuna_hpc), "optuna and tune cannot be run simultaneously!"
-    assert not (args.optuna and args.optuna_hpc), "optuna and optuna_hpc cannot be run simultaneously"
+    # assert not (args.tune_mode != None and args.optuna_hpc), "optuna and tune cannot be run simultaneously!"
+    # assert not (args.optuna and args.optuna_hpc), "optuna and optuna_hpc cannot be run simultaneously"
     args.kfold = False
-    if args.optuna:    
-        optimise(args)
-    elif args.optuna_hpc:
+    # if args.optuna:    
+    #     optimise(args)
+    if args.optuna:
         mp.spawn(main_worker_optimise, nprocs=args.ngpus_per_node, args=(args,))
     elif args.tune_mode != None:
         tune(args)
@@ -149,7 +149,7 @@ def main():
         else:
             main_worker(gpu=0, args=args)
 
-def optimise(args):
+def optimise_old(args):
     def objective(trial):
         print("Trial Number " + str(trial.number))
         args.test_mode = False
@@ -388,7 +388,7 @@ def main_worker(gpu, args):
 
     return accuracy
 
-import time 
+# import time 
 def main_worker_optimise(gpu, args):
     def objective(trial):
         # if args.rank == 0:
@@ -495,15 +495,12 @@ def main_worker_optimise(gpu, args):
             post_label=post_label,
             post_pred=post_pred,
         )
-        
-        del model
-        gc.collect()
-        torch.cuda.empty_cache()
-        
+         
+        test_accuracy = 0
         if args.rank == 0:
             args.train_distributed = args.distributed
             args.distributed = False #dont use distributed testing
-            accuracy = test.test_model(args)
+            test_accuracy = test.test_model(args, model)
             args.distributed = args.train_distributed
             
             gc.collect()
@@ -514,7 +511,12 @@ def main_worker_optimise(gpu, args):
             path = os.path.join(args.logdir, "OPTUNA study.pkl")
             joblib.dump(study, path) 
             
-            return accuracy
+             
+        del model
+        gc.collect()
+        torch.cuda.empty_cache()
+        
+        return test_accuracy #only gpu 0 will have a non 0 value. Other gpus will not update optuna
     
     if args.distributed:
         torch.multiprocessing.set_start_method("fork", force=True)
