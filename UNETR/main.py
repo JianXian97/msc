@@ -545,10 +545,10 @@ def main_worker_optimise(gpu, args):
                 study = joblib.load(path)
                 print("loaded optuna study")
             except:
-                study = optuna.create_study(study_name="optimise 100G", direction='maximize')
+                study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
                 print("Created optuna study!")
         else:
-            study = optuna.create_study(study_name="optimise 100G", direction='maximize')
+            study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
             print("Created optuna study")
         study.optimize(objective, n_trials=n_trials)
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
