@@ -77,6 +77,9 @@ class UNETMV(nn.Module):
         if hidden_size % num_heads != 0:
             raise AssertionError("hidden size should be divisible by num_heads.")
             
+        if mlp_dim % hidden_size != 4:
+            raise AssertionError("mlp dim should be 4 times of hidden size.")
+            
         for i, size in enumerate(img_size):
             if size < patch_size[i]:
                 raise AssertionError("img size cannot be smaller than patch size for dim " + str(i))

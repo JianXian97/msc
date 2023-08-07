@@ -163,7 +163,8 @@ def optimise_old(args):
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
         args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
          
-      
+        args.mlp_dim = 4 * args.hidden_size
+        
         if args.distributed:            
             args.optim_lr = trial.suggest_categorical("lr", lr_list)
             mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
@@ -408,6 +409,8 @@ def main_worker_optimise(gpu, args):
         args.feature_size = trial.suggest_categorical("Model feature size, F", [4,8,12,16,20])
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
         args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
+        
+        args.mlp_dim = 4 * args.hidden_size
         
         model = UNETMV(
             in_channels=args.in_channels,
