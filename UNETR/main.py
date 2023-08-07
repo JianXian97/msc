@@ -555,7 +555,13 @@ def main_worker_optimise(gpu, args):
             study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
             study = add_default(study)
             print("Created optuna study")
-        study.optimize(objective, n_trials=n_trials)
+        
+        if study.trials < 30:
+            study.optimize(objective, n_trials=30)
+        else:        
+            study.sampler = optuna.samplers.TPESampler()
+            study.optimize(objective, n_trials= (n_trials - 30))
+        
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
         complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
