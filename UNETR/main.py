@@ -546,9 +546,11 @@ def main_worker_optimise(gpu, args):
                 print("loaded optuna study")
             except:
                 study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
+                study = add_default(study)
                 print("Created optuna study!")
         else:
             study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
+            study = add_default(study)
             print("Created optuna study")
         study.optimize(objective, n_trials=n_trials)
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
@@ -582,8 +584,17 @@ def main_worker_optimise(gpu, args):
             trial = None #this will be updated using broadcast 
             objective(trial) 
    
+def add_default(study):
+    params = {'Dropout': 0, 
+              'Hidden size, E': 72, 
+              'Model feature size, F': 8, 
+              'Decode mode': 'simple', 
+              'Cft mode': 'channel', 
+              'lr': 2e-04}    
+    study.enqueue_trial(params)
+    return study
     
-
+    
 def tune(args):
     output = {}
     if args.tune_mode == "archi":
