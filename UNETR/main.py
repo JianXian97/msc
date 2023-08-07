@@ -556,7 +556,7 @@ def main_worker_optimise(gpu, args):
             study = add_default(study)
             print("Created optuna study")
         
-        if study.trials < 30:
+        if len(study.trials) < 30:
             study.optimize(objective, n_trials=30)
         else:        
             study.sampler = optuna.samplers.TPESampler()
