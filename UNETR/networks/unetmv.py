@@ -78,6 +78,8 @@ class UNETMV(nn.Module):
             raise AssertionError("hidden size should be divisible by num_heads.")
             
         if mlp_dim % hidden_size != 4:
+            print("mlp_dim: " + str(mlp_dim))
+            print("hidden_size: " + str(hidden_size))
             raise AssertionError("mlp dim should be 4 times of hidden size.")
             
         for i, size in enumerate(img_size):
