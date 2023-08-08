@@ -508,7 +508,7 @@ def main_worker_optimise(gpu, args):
             
             gc.collect()
             torch.cuda.empty_cache()
-            
+            print("Trial " + str(trial.number) + " TEST Accuracy " + str(test_accuracy))
             path = os.path.join(args.logdir, args.optuna_expt_file_name)
             study.trials_dataframe().to_pickle(path)            
             path = os.path.join(args.logdir, args.optuna_study_file_name)
@@ -549,11 +549,11 @@ def main_worker_optimise(gpu, args):
                 print("loaded optuna study")
             except:
                 study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
-                study = add_default(study, args.ngpus_per_node)
+                study = add_default(study, args)
                 print("Created optuna study!")
         else:
             study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
-            study = add_default(study, args.ngpus_per_node)
+            study = add_default(study, args)
             print("Created optuna study")
         
         if len(study.trials) < 30:
@@ -593,14 +593,15 @@ def main_worker_optimise(gpu, args):
             trial = None #this will be updated using broadcast 
             objective(trial) 
    
-def add_default(study, ngpus):
+def add_default(study, args):
     params = {'Dropout': 0, 
               'Hidden size, E': 72, 
               'Model feature size, F': 8, 
               'Decode mode': 'simple', 
               'Cft mode': 'channel', 
-              'lr': 1e-04}    
-    params['lr'] *=  ngpus
+              'lr': 1e-04}  
+    if args.distributed:
+        params['lr'] *=  args.ngpus_per_node
     study.enqueue_trial(params)
     return study
     
