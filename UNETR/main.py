@@ -509,10 +509,10 @@ def main_worker_optimise(gpu, args):
             gc.collect()
             torch.cuda.empty_cache()
             
-            path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
+            path = os.path.join(args.logdir, args.optuna_expt_file_name)
             study.trials_dataframe().to_pickle(path)            
-            path = os.path.join(args.logdir, "OPTUNA study.pkl")
-            joblib.dump(study, path) 
+            path = os.path.join(args.logdir, args.optuna_study_file_name)
+            joblib.dump(study, path)     
             
              
         del model
