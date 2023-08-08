@@ -412,13 +412,6 @@ def main_worker_optimise(gpu, args):
         
         args.mlp_dim = 4 * args.hidden_size
         
-        args.mlp_dim = 4 * args.hidden_size
-        
-        if args.distributed:            
-            args.optim_lr = trial.suggest_categorical("lr", lr_list)
-        else:
-            args.optim_lr = trial.suggest_categorical("lr", lr_list)
-        
         model = UNETMV(
             in_channels=args.in_channels,
             out_channels=args.out_channels,
@@ -556,11 +549,11 @@ def main_worker_optimise(gpu, args):
                 print("loaded optuna study")
             except:
                 study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
-                study = add_default(study)
+                study = add_default(study, args.ngpus_per_node)
                 print("Created optuna study!")
         else:
             study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
-            study = add_default(study)
+            study = add_default(study, args.ngpus_per_node)
             print("Created optuna study")
         
         if len(study.trials) < 30:
@@ -600,13 +593,14 @@ def main_worker_optimise(gpu, args):
             trial = None #this will be updated using broadcast 
             objective(trial) 
    
-def add_default(study):
+def add_default(study, ngpus):
     params = {'Dropout': 0, 
               'Hidden size, E': 72, 
               'Model feature size, F': 8, 
               'Decode mode': 'simple', 
               'Cft mode': 'channel', 
-              'lr': 2e-04}    
+              'lr': 1e-04}    
+    params['lr'] *=  ngpus
     study.enqueue_trial(params)
     return study
     
