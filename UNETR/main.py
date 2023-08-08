@@ -412,6 +412,13 @@ def main_worker_optimise(gpu, args):
         
         args.mlp_dim = 4 * args.hidden_size
         
+        args.mlp_dim = 4 * args.hidden_size
+        
+        if args.distributed:            
+            args.optim_lr = trial.suggest_categorical("lr", lr_list)
+        else:
+            args.optim_lr = trial.suggest_categorical("lr", lr_list)
+        
         model = UNETMV(
             in_channels=args.in_channels,
             out_channels=args.out_channels,
