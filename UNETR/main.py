@@ -596,7 +596,7 @@ def main_worker_optimise(gpu, args):
 def add_default(study, args):
     params = {'Dropout': 0, 
               'Hidden size, E': 72, 
-              'Model feature size, F': 8, 
+              'Model feature size, F': 16, 
               'Decode mode': 'simple', 
               'Cft mode': 'channel', 
               'lr': 1e-04}  
