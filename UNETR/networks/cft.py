@@ -273,6 +273,9 @@ class CFT(MobileVitBlock):
     def forward(self, f1, f2, f3, f4):
         res1, res2, res3, res4 = f1, f2, f3, f4
         
+        if self.mode == 'skip':
+            return f1, f2, f3, f4
+        
         if self.mode in ['channel', 'all']:        
             f1, f2, f3, f4 = self.channel_attn(f1, f2, f3, f4)
         if self.mode in ['patch', 'all']:
