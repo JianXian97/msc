@@ -114,6 +114,7 @@ parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume op
 # parser.add_argument("--optuna_hpc", action="store_true", help="Run optuna, hyperparameter tuning on HPC")
 parser.add_argument("--optuna_expt_file_name", default="OPTUNA Expt Results.pkl", type=str, help="File name of optuna experimental results.")
 parser.add_argument("--optuna_study_file_name", default="OPTUNA study.pkl", type=str, help="File name of optuna study.")
+parser.add_argument("--optuna_add_trials", default=None, type=str, help="File path to import optuna study.")
 
 
 def main():
@@ -148,80 +149,6 @@ def main():
             mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
         else:
             main_worker(gpu=0, args=args)
-
-def optimise_old(args):
-    def objective(trial):
-        print("Trial Number " + str(trial.number))
-        args.test_mode = False
-        
-        args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.1))        
-        lr_list = [1e-6,1e-5,1e-4,1e-3]
-        if args.distributed:            
-            lr_list = [x*args.ngpus_per_node for x in lr_list]
-        args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,54,72,90])
-        args.feature_size = trial.suggest_categorical("Model feature size, F", [4,8,12,16,20])
-        args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
-        args.cft_mode =  trial.suggest_categorical("Cft mode", ['channel', 'patch', 'all'])
-         
-        args.mlp_dim = 4 * args.hidden_size
-        
-        if args.distributed:            
-            args.optim_lr = trial.suggest_categorical("lr", lr_list)
-            mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
-        
-        else:
-            args.optim_lr = trial.suggest_categorical("lr", lr_list)
-        
-        args.train_distributed = args.distributed
-        args.distributed = False #dont use distributed testing
-        accuracy = test.test_model(args)
-        args.distributed = args.train_distributed
-        
-        gc.collect()
-        torch.cuda.empty_cache()
-        
-        path = os.path.join(args.logdir, args.optuna_expt_file_name)
-        study.trials_dataframe().to_pickle(path)            
-        path = os.path.join(args.logdir, args.optuna_study_file_name)
-        joblib.dump(study, path)     
-        
-        return accuracy
-    
-    print("Running Optuna")
-    args.pretrained_dir = args.logdir #used while conducting tests
-    args.pretrained_model_name = "model.pt" #used while conducting tests
-    if args.optuna_load_dir is not None:
-        path = os.path.join(args.optuna_load_dir, args.optuna_study_file_name)
-        try:
-            study = joblib.load(path)
-            print("loaded optuna study")
-        except:
-            study = optuna.create_study(study_name="optimise 100G", direction='maximize')
-            print("Created optuna study!")
-    else:
-        study = optuna.create_study(study_name="optimise 100G", direction='maximize')
-        print("Created optuna study")
-        
-    study.optimize(objective, n_trials=50, gc_after_trial=True)
-    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
-    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
-
-    print("Study statistics: ")
-    print("  Number of finished trials: ", len(study.trials))
-    print("  Number of pruned trials: ", len(pruned_trials))
-    print("  Number of complete trials: ", len(complete_trials))
-
-    print("Best trial:")
-    trial = study.best_trial
-
-    print("  Value: ", trial.value)
-
-    print("  Params: ")
-    for key, value in trial.params.items():
-        print("    {}: {}".format(key, value))
-    
-    path = os.path.join(args.logdir, "OPTUNA Expt Results.pkl")
-    study.trials_dataframe().to_pickle(path)
 
 def main_worker(gpu, args):
 
@@ -402,9 +329,9 @@ def main_worker_optimise(gpu, args):
         args.test_mode = False
         
         args.dropout_rate = trial.suggest_categorical("Dropout", np.arange(0,0.5,0.1))        
-        lr_list = [1e-6,1e-5,1e-4,1e-3]
-        if args.distributed:            
-            lr_list = [x*args.ngpus_per_node for x in lr_list]
+        # lr_list = [1e-6,1e-5,1e-4,1e-3]
+        # if args.distributed:            
+        #     lr_list = [x*args.ngpus_per_node for x in lr_list]
         args.hidden_size = trial.suggest_categorical("Hidden size, E", [18,36,54,72,90])
         args.feature_size = trial.suggest_categorical("Model feature size, F", [4,8,12,16,20])
         args.decode_mode = trial.suggest_categorical("Decode mode", ['CA', 'simple'])
@@ -536,7 +463,7 @@ def main_worker_optimise(gpu, args):
     loader = get_loader(args)
     inf_size = [args.roi_x, args.roi_y, args.roi_z]  
     print(args.rank, " gpu", args.gpu)
-    n_trials = 50
+    n_trials = 30
     if args.rank == 0:
         print("Batch size is:", args.batch_size, "epochs", args.max_epochs)   
         print("Running Optuna")
@@ -556,7 +483,11 @@ def main_worker_optimise(gpu, args):
             study = add_default(study, args)
             print("Created optuna study")
         
-        if len(study.trials) < 30:
+        if args.optuna_add_trials is not None:
+            study2 = joblib.load(args.optuna_add_trials)
+            study.add_trials(study2.trials)
+        
+        if len(study.trials) < 20:
             study.optimize(objective, n_trials=30)
         else:        
             study.sampler = optuna.samplers.TPESampler()
