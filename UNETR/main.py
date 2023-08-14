@@ -108,7 +108,7 @@ parser.add_argument("--resume_ckpt", action="store_true", help="resume training 
 parser.add_argument("--resume_jit", action="store_true", help="resume training from pretrained torchscript checkpoint")
 parser.add_argument("--smooth_dr", default=1e-6, type=float, help="constant added to dice denominator to avoid nan")
 parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added to dice numerator to avoid zero")
-parser.add_argument("--tune_mode", default=None, type=str, help="Tune mode, either 'archi' or 'EF'")
+parser.add_argument("--tune", action="store_true", help="Run tuning for ablation study")
 parser.add_argument("--optuna", action="store_true", help="Run optuna, hyperparameter tuning")
 parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume optuna optimisation from file")
 # parser.add_argument("--optuna_hpc", action="store_true", help="Run optuna, hyperparameter tuning on HPC")
@@ -124,8 +124,6 @@ def main():
     # args.data_dir = "../../datasets/AMOS"
     # args.model_name = "unetmv"
     # args.logdir = "./runs/" + args.logdir
-    # args.tune = True
-    # args.optuna = True
     # args.distributed = True
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
@@ -134,16 +132,12 @@ def main():
         manager = mp.Manager()
         args.shared_list = manager.list()
                 
-    assert not (args.tune_mode != None and args.optuna), "optuna and tune cannot be run simultaneously!"
-    # assert not (args.tune_mode != None and args.optuna_hpc), "optuna and tune cannot be run simultaneously!"
-    # assert not (args.optuna and args.optuna_hpc), "optuna and optuna_hpc cannot be run simultaneously"
-    args.kfold = False
-    # if args.optuna:    
-    #     optimise(args)
+    assert not (args.tune and args.optuna), "optuna and tune cannot be run simultaneously!"
+    args.kfold = False 
     if args.optuna:
         mp.spawn(main_worker_optimise, nprocs=args.ngpus_per_node, args=(args,))
-    elif args.tune_mode != None:
-        tune(args)
+    elif args.tune:
+        mp.spawn(main_worker_tune, nprocs=args.ngpus_per_node, args=(args,))
     else:            
         if args.distributed:            
             mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
@@ -303,11 +297,7 @@ def main_worker(gpu, args):
         post_label=post_label,
         post_pred=post_pred,
     )
-    
-    # if args.optuna or args.tune_mode != None: #store output in a queue
-        # accuracy.share_memory_()
-        # args.q.put(accuracy)
-    
+ 
     del model
     gc.collect()
     torch.cuda.empty_cache()
@@ -316,7 +306,6 @@ def main_worker(gpu, args):
 
     return accuracy
 
-# import time 
 def main_worker_optimise(gpu, args):
     def objective(trial):
         # if args.rank == 0:
@@ -464,6 +453,7 @@ def main_worker_optimise(gpu, args):
     inf_size = [args.roi_x, args.roi_y, args.roi_z]  
     print(args.rank, " gpu", args.gpu)
     n_trials = 30
+    n_trials_rand = 20
     if args.rank == 0:
         print("Batch size is:", args.batch_size, "epochs", args.max_epochs)   
         print("Running Optuna")
@@ -478,7 +468,7 @@ def main_worker_optimise(gpu, args):
                 study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
                 study = add_default(study, args)
                 print("Created optuna study!")
-        else:
+        else:   
             study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
             study = add_default(study, args)
             print("Created optuna study")
@@ -486,12 +476,13 @@ def main_worker_optimise(gpu, args):
         if args.optuna_add_trials is not None:
             study2 = joblib.load(args.optuna_add_trials)
             study.add_trials(study2.trials)
+            print("Trials added!")
         
-        if len(study.trials) < 20:
-            study.optimize(objective, n_trials=30)
+        if len(study.trials) < n_trials_rand:
+            study.optimize(objective, n_trials=n_trials_rand)
         else:        
             study.sampler = optuna.samplers.TPESampler()
-            study.optimize(objective, n_trials= (n_trials - 30))
+            study.optimize(objective, n_trials= (n_trials - n_trials_rand))
         
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
         complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
@@ -514,13 +505,6 @@ def main_worker_optimise(gpu, args):
         study.trials_dataframe().to_pickle(path)
     else:
         for i in range(n_trials):
-            # while(len(args.shared_list) == 0):
-            #     time.sleep(0.1)
-                
-            # trial = args.shared_list[-1]
-            # while(trial.number < i):
-            #     time.sleep(0.1)
-            #     trial = args.shared_list[-1]
             trial = None #this will be updated using broadcast 
             objective(trial) 
    
@@ -536,76 +520,42 @@ def add_default(study, args):
     study.enqueue_trial(params)
     return study
     
-    
-def tune(args):
-    output = {}
-    if args.tune_mode == "archi":
-        hyper_params = {
-            'decode_mode': ['CA', 'simple'],
-            'cft_mode': ['channel', 'patch', 'all']
+
+def main_worker_tune(gpu, args):
+    #TODO
+    pass
+            
+def get_tune_comb():
+    default = {'E': 72,
+               'F': 16,
+               'decode_mode': 'simple',
+               'cft_mode': 'channel'
         }
-        combinations = list(itertools.product(*hyper_params.values()))    
-
-        args.checkpoint_filename_old = args.checkpoint_filename
-        for count, c in enumerate(combinations):
-            args.decode_mode = c[0]
-            args.cft_mode = c[1]
-            print(str(count+1) + "/" + str(len(combinations)) + " Training modes " + c[0] + " " + c[1])
-            args.checkpoint_filename = args.checkpoint_filename_old[:-3] + "_" + args.decode_mode + "_" + args.cft_mode + "_" + ".pt" 
-            
-            if args.distributed:
-                mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))        
-                accuracy = args.q.get()
-            else:
-                accuracy = main_worker(gpu=0, args=args)
-                
-            output[c[0] + "_" + c[1]] = accuracy
-            del accuracy
-            
-            gc.collect()
-            torch.cuda.empty_cache()
-            
-    elif args.tune_mode == "EF":
-        num_pts = 5
-        params = {'E' : [args.hidden_size for i in range(num_pts)],
-                  'F' : [args.feature_size for i in range(num_pts)]
-            }
-        points = {'E' : [18,36,54,72,90],
-                  'F' : [4,8,12,16,20,24]
-            }
-        count = 0
-        for pos, var in enumerate(['E', 'F']):
-            new_params = params.copy()
-            new_params[var] = points[var]
-            for i in range(num_pts):        
-                count += 1
-                print(str(count) + "/" + str(2 * num_pts) + " E " + str(new_params['E'][i]) + " F " + str(new_params['F'][i]))
-                args.hidden_size = new_params['E'][i]
-                args.feature_size = new_params['F'][i]
-                
-                if args.distributed:
-                    mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))        
-                    accuracy = args.q.get()
-
-                else:
-                    accuracy = main_worker(gpu=0, args=args)
-                    
-                output["Var: " + var + " E: " + str(new_params['E'][i]) + " F: " + str(new_params['F'])] = accuracy
-                del accuracy
-                
-                # gc.collect()
-                # torch.cuda.empty_cache()
-                # torch.distributed.barrier()
-                # gpu_usage(args)
-    else:
-        raise("Invalid tune mode")
     
-    print(output)
-    output = list(sorted(output.items(), key=lambda item: item[1], reverse=True))
-    print("Best config: " + str(output[0][0]))
-    print("Best acc: " + str(output[0][1]))
-    return output[0][1] 
- 
+    combinations = {}
+    
+    options = {'E' : [18,36,54,72,90],
+              'F' : [4,8,12,16,20],
+              'decode_mode': ['CA', 'simple'],
+              'cft_mode': ['channel', 'patch', 'all']
+              }
+    count = 0
+    for key in ['E', 'F']:
+        new_set = default.copy()
+        for value in options[key]:
+            new_set[key] = value
+            combinations[count] = new_set.copy()
+            count += 1
+    
+    for dec in options['decode_mode']:
+        for cft in options['cft_mode']:
+            new_set = default.copy()
+            new_set['decode_mode'] = dec
+            new_set['cft_mode'] = cft
+            combinations[count] = new_set.copy()
+            count += 1
+            
+    return combinations
         
 if __name__ == "__main__":
     main()
