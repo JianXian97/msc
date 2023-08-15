@@ -677,15 +677,19 @@ def main_worker_tune(gpu, args):
         torch.distributed.barrier() #block until all gpus have reached here
         dice_scores, hd_scores = objective(combi, i + progress) 
         
-        if args.rank == 0 and prev_results is not None:
+        if args.rank == 0:
             combi['dice'] = dice_scores
             combi['dice_avg'] = np.mean(dice_scores)
             combi['hd'] = hd_scores
             combi['hd_avg'] = np.nanmean(hd_scores)
             new_results.append(combi)
-            temp = pd.concat([prev_results, pd.DataFrame.from_dict(new_results)])                           
+            if prev_results is not None:
+                temp = pd.concat([prev_results, pd.DataFrame.from_dict(new_results)])    
+            else:
+                temp = pd.DataFrame.from_dict(new_results)                       
             path = os.path.join(args.logdir, args.tune_file_name)
             temp.to_pickle(path)
+            print("Saved progress")
         
             
 def get_tune_comb():
