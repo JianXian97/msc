@@ -476,13 +476,14 @@ def main_worker_optimise(gpu, args):
             study2 = joblib.load(args.optuna_add_trials)
             study.add_trials(study2.trials)
             print("Trials added!")
+            print("Num of trials: " + str(len(study.trials)))
         
         if len(study.trials) < n_trials_rand:
             study.optimize(objective, n_trials=n_trials_rand)
-        else:        
-            study.sampler = optuna.samplers.TPESampler()
-            study.optimize(objective, n_trials= (n_trials - n_trials_rand))
-        
+               
+        study.sampler = optuna.samplers.TPESampler()
+        study.optimize(objective, n_trials= (n_trials - n_trials_rand))
+    
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
         complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
