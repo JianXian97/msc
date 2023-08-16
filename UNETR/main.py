@@ -465,11 +465,13 @@ def main_worker_optimise(gpu, args):
                 print("loaded optuna study")
             except:
                 study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
-                study = add_default(study, args)
+                if args.optuna_add_trials is None:
+                    study = add_default(study, args)
                 print("Created optuna study!")
         else:   
             study = optuna.create_study(study_name="optimise 100G", direction='maximize', sampler=optuna.samplers.RandomSampler())
-            study = add_default(study, args)
+            if args.optuna_add_trials is None:
+                study = add_default(study, args)
             print("Created optuna study")
         
         if args.optuna_add_trials is not None:
