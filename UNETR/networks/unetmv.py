@@ -21,7 +21,6 @@ from monai.networks.blocks.convolutions import ResidualUnit
 from monai.networks.blocks.dynunet_block import get_conv_layer
  
 from networks.mobilevit import MobileVitBlock
-from networks.gct import GCT
 from networks.cft import CFT
 from networks.caupblock import CAUpBlock
 
@@ -126,20 +125,7 @@ class UNETMV(nn.Module):
         #     last_conv_only = False,
         # )
         
-        # self.gct_scale = 2
-        # self.gct = GCT(
-        #         in_channels = feature_size*(2**self.gct_scale),
-        #         dropout_rate = 0,
-        #         norm_name = "instance",      
-        #         transformer_dim = hidden_size,
-        #         local_out_channels = 8,
-        #         hidden_dim = mlp_dim,
-        #         num_heads = num_heads,
-        #         num_layers = 3,
-        #         img_size = tuple(x // 2**self.gct_scale for x in img_size),   
-        #         patch_size = tuple(x // 2**self.gct_scale for x in (12,12,12)),
-        #         out_channels = feature_size*(2**self.gct_scale),        
-        #         )
+ 
         
         self.cft_scale = 1
         self.cft = CFT(
@@ -269,8 +255,6 @@ class UNETMV(nn.Module):
         enc5 = self.mobilevit_blocks[4](x_in5)
                 
         enc1,enc2,enc3,enc4 = self.cft(enc1, enc2, enc3, enc4)
-        
-        # z = self.gct(enc3, enc4, enc5)
         
         dec4 = self.decoders[3](enc5, enc4)       
         dec3 = self.decoders[2](dec4, enc3)              

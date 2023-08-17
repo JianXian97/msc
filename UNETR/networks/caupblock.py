@@ -18,7 +18,7 @@ from monai.networks.blocks.convolutions import Convolution
 
 from networks.crossattention import CABlock
 from networks.mobilevit import fold_proj, unfold_proj
-from networks.gct import CrossTransformerBlock
+from networks.crosstransformer import CrossTransformerBlock
 
 #cross attention upsampling block
 class CAUpBlock(nn.Module):

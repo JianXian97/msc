@@ -8,7 +8,7 @@ from monai.networks.blocks import ADN
 from monai.networks.blocks.mlp import MLPBlock
 from networks.crossattention import CABlock
 from networks.mobilevit import MobileVitBlock, fold_proj, unfold_proj
-from networks.gct import CrossTransformerBlock
+from networks.crosstransformer import CrossTransformerBlock
 
 
 from monai.networks.blocks.convolutions import Convolution
