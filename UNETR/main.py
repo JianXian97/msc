@@ -116,6 +116,7 @@ parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume op
 parser.add_argument("--optuna_expt_file_name", default="OPTUNA Expt Results.pkl", type=str, help="File name of optuna experimental results.")
 parser.add_argument("--optuna_study_file_name", default="OPTUNA study.pkl", type=str, help="File name of optuna study.")
 parser.add_argument("--optuna_add_trials", default=None, type=str, help="File path to import optuna study.")
+parser.add_argument("--optuna_add_n_trials", default=0, type=int, help="import latest n optuna study trials.")
 
 
 def main():
@@ -475,7 +476,7 @@ def main_worker_optimise(gpu, args):
             print("Created optuna study")
         
         if args.optuna_add_trials is not None:
-            study2 = joblib.load(args.optuna_add_trials)
+            study2 = joblib.load(args.optuna_add_trials[-args.optuna_add_n_trials:]) #add latest n trials. default is adding all of them
             study.add_trials(study2.trials)
             print("Trials added!")
             print("Num of trials: " + str(len(study.trials)))
