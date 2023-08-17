@@ -485,6 +485,7 @@ def main_worker_optimise(gpu, args):
             study.optimize(objective, n_trials=n_trials_rand)
                
         study.sampler = optuna.samplers.TPESampler()
+        print("begin exploitation")
         study.optimize(objective, n_trials= (n_trials - n_trials_rand))
     
         pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
