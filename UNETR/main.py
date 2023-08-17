@@ -476,8 +476,8 @@ def main_worker_optimise(gpu, args):
             print("Created optuna study")
         
         if args.optuna_add_trials is not None:
-            study2 = joblib.load(args.optuna_add_trials[-args.optuna_add_n_trials:]) #add latest n trials. default is adding all of them
-            study.add_trials(study2.trials)
+            study2 = joblib.load(args.optuna_add_trials) #add latest n trials. default is adding all of them
+            study.add_trials(study2.trials[-args.optuna_add_n_trials:])
             print("Trials added!")
             print("Num of trials: " + str(len(study.trials)))
         
