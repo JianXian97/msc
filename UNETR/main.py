@@ -454,7 +454,7 @@ def main_worker_optimise(gpu, args):
     loader = get_loader(args)
     inf_size = [args.roi_x, args.roi_y, args.roi_z]  
     print(args.rank, " gpu", args.gpu)
-    n_trials = 30
+    n_trials = 40
     n_trials_rand = 20
     if args.rank == 0:
         print("Batch size is:", args.batch_size, "epochs", args.max_epochs)   
