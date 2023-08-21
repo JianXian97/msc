@@ -83,8 +83,8 @@ class UNETMV(nn.Module):
             if size < patch_size[i]:
                 raise AssertionError("img size cannot be smaller than patch size for dim " + str(i))
             
-            if patch_size[i] < 16:
-                raise AssertionError("min patch size is 16 for each dimension")
+            # if patch_size[i] < 16:
+            #     raise AssertionError("min patch size is 16 for each dimension")
         
         if decode_mode not in ['simple', 'CA']:
             raise AssertionError("decode mode should be either 'simple' or 'CA'.")
@@ -145,8 +145,8 @@ class UNETMV(nn.Module):
         self.mobilevit_blocks = nn.ModuleList()
         self.downsample_blocks = nn.ModuleList()
         for i in range(5):
-            patch_size = tuple(x // 2**i for x in self.patch_size)
-            img_size = tuple(x // 2 for x in img_size)
+            patch_size = tuple(max(x // 2**i,1) for x in self.patch_size)
+            img_size = tuple(max(x // 2,1) for x in img_size)
             layer = MobileVitBlock(
                 in_channels = feature_size * (2 ** i),
                 dropout_rate = dropout_rate,
@@ -170,34 +170,62 @@ class UNETMV(nn.Module):
                 break
 
             #downsample layers, only 4 needed
-            layer = ResidualUnit(
-                spatial_dims = 3,
-                in_channels = feature_size * (2 ** (i+1)),
-                out_channels = feature_size * (2 ** (i+1)),
-                strides = 2,
-                kernel_size = 3,
-                act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
-                norm = "INSTANCE",
-                dropout = dropout_rate,
-                bias = True,
-                last_conv_only = False,
-            )
+            #TODO
+            if i < 3:
+                layer = ResidualUnit(
+                    spatial_dims = 3,
+                    in_channels = feature_size * (2 ** (i+1)),
+                    out_channels = feature_size * (2 ** (i+1)),
+                    strides = 2,
+                    kernel_size = 3,
+                    act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
+                    norm = "INSTANCE",
+                    dropout = dropout_rate,
+                    bias = True,
+                    last_conv_only = False,
+                )
+            
+            else:
+                layer = ResidualUnit(
+                    spatial_dims = 3,
+                    in_channels = feature_size * (2 ** (i+1)),
+                    out_channels = feature_size * (2 ** (i+1)),
+                    strides = (2,3,3),
+                    kernel_size = 3,
+                    act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
+                    norm = "INSTANCE",
+                    dropout = dropout_rate,
+                    bias = True,
+                    last_conv_only = False,
+                )
 
             self.downsample_blocks.append(layer)
         
 
         self.decoders = nn.ModuleList()
         if decode_mode == "simple":
+            #TODO
             for i in range(4):
-                layer = UnetrUpBlock(
-                    spatial_dims=3,
-                    in_channels=feature_size * (2**(i+2)),
-                    out_channels=feature_size * (2**(i+1)),
-                    kernel_size=1,
-                    upsample_kernel_size=2,
-                    norm_name=norm_name,
-                    res_block=res_block,
-                )
+                if i < 3:
+                    layer = UnetrUpBlock(
+                        spatial_dims=3,
+                        in_channels=feature_size * (2**(i+2)),
+                        out_channels=feature_size * (2**(i+1)),
+                        kernel_size=1,
+                        upsample_kernel_size=2,
+                        norm_name=norm_name,
+                        res_block=res_block,
+                    )
+                else:
+                    layer = UnetrUpBlock(
+                        spatial_dims=3,
+                        in_channels=feature_size * (2**(i+2)),
+                        out_channels=feature_size * (2**(i+1)),
+                        kernel_size=1,
+                        upsample_kernel_size=(2,3,3),
+                        norm_name=norm_name,
+                        res_block=res_block,
+                    )
                 self.decoders.append(layer)
                 
                 
