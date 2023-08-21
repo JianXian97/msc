@@ -144,9 +144,11 @@ class UNETMV(nn.Module):
         
         self.mobilevit_blocks = nn.ModuleList()
         self.downsample_blocks = nn.ModuleList()
+        img_size_list = [img_size]
         for i in range(5):
             patch_size = tuple(max(x // 2**i,1) for x in self.patch_size)
             img_size = tuple(max(x // 2,1) for x in img_size)
+            img_size_list.append(img_size)
             layer = MobileVitBlock(
                 in_channels = feature_size * (2 ** i),
                 dropout_rate = dropout_rate,
@@ -166,66 +168,41 @@ class UNETMV(nn.Module):
             
 
             self.mobilevit_blocks.append(layer)
-            if i == 4:
-                break
-
-            #downsample layers, only 4 needed
-            #TODO
-            if i < 3:
-                layer = ResidualUnit(
-                    spatial_dims = 3,
-                    in_channels = feature_size * (2 ** (i+1)),
-                    out_channels = feature_size * (2 ** (i+1)),
-                    strides = 2,
-                    kernel_size = 3,
-                    act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
-                    norm = "INSTANCE",
-                    dropout = dropout_rate,
-                    bias = True,
-                    last_conv_only = False,
-                )
             
-            else:
-                layer = ResidualUnit(
-                    spatial_dims = 3,
-                    in_channels = feature_size * (2 ** (i+1)),
-                    out_channels = feature_size * (2 ** (i+1)),
-                    strides = (2,3,3),
-                    kernel_size = 3,
-                    act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
-                    norm = "INSTANCE",
-                    dropout = dropout_rate,
-                    bias = True,
-                    last_conv_only = False,
-                )
-
+        for i in range(4):
+            #downsample layers, only 4 needed
+            downsample_strides = tuple([i//j for i, j in zip(img_size_list[i+1], img_size_list[i+2])]) #handle sizes when inputs size is < (96,96,96)
+            layer = ResidualUnit(
+                spatial_dims = 3,
+                in_channels = feature_size * (2 ** (i+1)),
+                out_channels = feature_size * (2 ** (i+1)),
+                strides = downsample_strides,
+                kernel_size = 3,
+                act = ("leakyrelu", {"inplace": True, "negative_slope": 0.01}),
+                norm = "INSTANCE",
+                dropout = dropout_rate,
+                bias = True,
+                last_conv_only = False,
+            )
+    
             self.downsample_blocks.append(layer)
         
 
         self.decoders = nn.ModuleList()
         if decode_mode == "simple":
             #TODO
+            
             for i in range(4):
-                if i < 3:
-                    layer = UnetrUpBlock(
-                        spatial_dims=3,
-                        in_channels=feature_size * (2**(i+2)),
-                        out_channels=feature_size * (2**(i+1)),
-                        kernel_size=1,
-                        upsample_kernel_size=2,
-                        norm_name=norm_name,
-                        res_block=res_block,
-                    )
-                else:
-                    layer = UnetrUpBlock(
-                        spatial_dims=3,
-                        in_channels=feature_size * (2**(i+2)),
-                        out_channels=feature_size * (2**(i+1)),
-                        kernel_size=1,
-                        upsample_kernel_size=(2,3,3),
-                        norm_name=norm_name,
-                        res_block=res_block,
-                    )
+                upsample_strides = tuple([i//j for i, j in zip(img_size_list[i+1], img_size_list[i+2])])
+                layer = UnetrUpBlock(
+                    spatial_dims=3,
+                    in_channels=feature_size * (2**(i+2)),
+                    out_channels=feature_size * (2**(i+1)),
+                    kernel_size=1,
+                    upsample_kernel_size=upsample_strides,
+                    norm_name=norm_name,
+                    res_block=res_block,
+                )
                 self.decoders.append(layer)
                 
                 
