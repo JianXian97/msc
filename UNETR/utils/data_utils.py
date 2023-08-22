@@ -17,7 +17,7 @@ import torch
 
 from monai import data, transforms
 from monai.data import load_decathlon_datalist
-
+from monai.utils import set_determinism
 
 class Sampler(torch.utils.data.Sampler):
     def __init__(self, dataset, num_replicas=None, rank=None, shuffle=True, make_even=True):
@@ -135,6 +135,9 @@ def get_loader_BTCV(args):
             transforms.ToTensord(keys=["image", "label"]),
         ]
     )
+    set_determinism(seed = 0)
+    train_transform.set_random_state(seed=0)
+    val_transform.set_random_state(seed=0)
 
     if args.test_mode:
         test_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
@@ -302,6 +305,9 @@ def get_loader_AMOS(args):
             transforms.ToTensord(keys=["image", "label"]),
         ]
     )
+    set_determinism(seed = 0)
+    train_transform.set_random_state(seed=0)
+    val_transform.set_random_state(seed=0)
 
     if args.test_mode:
         test_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
