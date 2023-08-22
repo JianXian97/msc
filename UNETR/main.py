@@ -117,6 +117,7 @@ parser.add_argument("--optuna_expt_file_name", default="OPTUNA Expt Results.pkl"
 parser.add_argument("--optuna_study_file_name", default="OPTUNA study.pkl", type=str, help="File name of optuna study.")
 parser.add_argument("--optuna_add_trials", default=None, type=str, help="File path to import optuna study.")
 parser.add_argument("--optuna_add_n_trials", default=0, type=int, help="import latest n optuna study trials.")
+parser.add_argument("--dataloader_seed", default=0, type=int, help="Default = 0, set None for non-determinism")
 
 
 def main():
