@@ -111,6 +111,7 @@ parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added
 parser.add_argument("--tune", action="store_true", help="Run tuning for ablation study")
 parser.add_argument("--tune_load_dir", default=None, type=str, help="Resume tuning from file")
 parser.add_argument("--tune_file_name", default="Tune Expt Results.pkl", type=str, help="File name of tuning results.")
+parser.add_argument("--tune_mode", default="all", type=str, help="Tune mode, either [all, dim, archi]")
 parser.add_argument("--optuna", action="store_true", help="Run optuna, hyperparameter tuning")
 parser.add_argument("--optuna_load_dir", default=None, type=str, help="Resume optuna optimisation from file")
 parser.add_argument("--optuna_expt_file_name", default="OPTUNA Expt Results.pkl", type=str, help="File name of optuna experimental results.")
@@ -659,7 +660,7 @@ def main_worker_tune(gpu, args):
     loader = get_loader(args)
     inf_size = [args.roi_x, args.roi_y, args.roi_z]  
     print(args.rank, " gpu", args.gpu)
-    combinations = get_tune_comb()
+    combinations = get_tune_comb(args.tune_mode)
     progress = 0
     prev_results = None
     if args.rank == 0:
@@ -698,7 +699,7 @@ def main_worker_tune(gpu, args):
             print("Saved progress")
         
             
-def get_tune_comb():
+def get_tune_comb(mode):
     default = {'E': 72,
                'F': 16,
                'decode_mode': 'simple',
@@ -713,20 +714,22 @@ def get_tune_comb():
               'cft_mode': ['channel', 'patch', 'all']
               }
     count = 0
-    for key in ['E', 'F']:
-        new_set = default.copy()
-        for value in options[key]:
-            new_set[key] = value
-            combinations[count] = new_set.copy()
-            count += 1
-    
-    for dec in options['decode_mode']:
-        for cft in options['cft_mode']:
+    if mode == 'all' or mode == 'dim':
+        for key in ['E', 'F']:
             new_set = default.copy()
-            new_set['decode_mode'] = dec
-            new_set['cft_mode'] = cft
-            combinations[count] = new_set.copy()
-            count += 1
+            for value in options[key]:
+                new_set[key] = value
+                combinations[count] = new_set.copy()
+                count += 1
+                
+    if mode == 'all' or mode == 'archi':
+        for dec in options['decode_mode']:
+            for cft in options['cft_mode']:
+                new_set = default.copy()
+                new_set['decode_mode'] = dec
+                new_set['cft_mode'] = cft
+                combinations[count] = new_set.copy()
+                count += 1
             
     return combinations
         
