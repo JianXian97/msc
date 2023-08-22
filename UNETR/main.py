@@ -137,6 +137,8 @@ def main():
         args.shared_list = manager.list()
                 
     assert not (args.tune and args.optuna), "optuna and tune cannot be run simultaneously!"
+    assert args.tune_mode in ['all', 'dim', 'archi'], "invalid tune mode!"
+    
     args.kfold = False 
     if args.optuna:
         mp.spawn(main_worker_optimise, nprocs=args.ngpus_per_node, args=(args,))
