@@ -71,7 +71,6 @@ parser.add_argument("--RandScaleIntensityd_prob", default=0.1, type=float, help=
 parser.add_argument("--RandShiftIntensityd_prob", default=0.1, type=float, help="RandShiftIntensityd aug probability")
 parser.add_argument("--pos_embed", default="perceptron", type=str, help="type of position embedding")
 parser.add_argument("--norm_name", default="instance", type=str, help="normalization layer type in decoder")
-parser.add_argument("--dataloader_seed", default=0, type=int, help="Default = 0, set None for non-determinism")
 
 
 def main():
