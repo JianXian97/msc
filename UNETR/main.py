@@ -206,7 +206,10 @@ def main_worker(gpu, args):
 
         if args.resume_ckpt:
             model_dict = torch.load(os.path.join(pretrained_dir, args.pretrained_model_name))
-            model.load_state_dict(model_dict)
+            try:
+                model.load_state_dict(model_dict)
+            except:
+                model.load_state_dict(model_dict["state_dict"])
             print("Use pretrained weights")
 
         if args.resume_jit:
