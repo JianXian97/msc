@@ -104,8 +104,8 @@ parser.add_argument("--RandShiftIntensityd_prob", default=0.1, type=float, help=
 parser.add_argument("--infer_overlap", default=0.5, type=float, help="sliding window inference overlap")
 parser.add_argument("--lrschedule", default="warmup_cosine", type=str, help="type of learning rate scheduler")
 parser.add_argument("--warmup_epochs", default=50, type=int, help="number of warmup epochs")
-parser.add_argument("--resume_ckpt", action="store_true", help="resume training from pretrained checkpoint")
-parser.add_argument("--resume_jit", action="store_true", help="resume training from pretrained torchscript checkpoint")
+parser.add_argument("--resume_pretrained_ckpt", action="store_true", help="resume training from pretrained checkpoint")
+parser.add_argument("--resume_pretrained_jit", action="store_true", help="resume training from pretrained torchscript checkpoint")
 parser.add_argument("--smooth_dr", default=1e-6, type=float, help="constant added to dice denominator to avoid nan")
 parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added to dice numerator to avoid zero")
 parser.add_argument("--tune", action="store_true", help="Run tuning for ablation study")
@@ -203,15 +203,12 @@ def main_worker(gpu, args):
                 cft_mode=args.cft_mode                
             )
 
-        if args.resume_ckpt:
+        if args.resume_pretrained_ckpt:
             model_dict = torch.load(os.path.join(pretrained_dir, args.pretrained_model_name))
-            try:
-                model.load_state_dict(model_dict)
-            except:
-                model.load_state_dict(model_dict["state_dict"])
+            model.load_state_dict(model_dict) 
             print("Use pretrained weights")
 
-        if args.resume_jit:
+        if args.resume_pretrained_jit:
             if not args.noamp:
                 print("Training from pre-trained checkpoint does not support AMP\nAMP is disabled.")
                 args.amp = args.noamp
@@ -243,12 +240,12 @@ def main_worker(gpu, args):
 
     if args.checkpoint is not None:
         checkpoint = torch.load(args.checkpoint, map_location="cpu")
-        from collections import OrderedDict
+        # from collections import OrderedDict
 
-        new_state_dict = OrderedDict()
-        for k, v in checkpoint["state_dict"].items():
-            new_state_dict[k.replace("backbone.", "")] = v
-        model.load_state_dict(new_state_dict, strict=False)
+        # new_state_dict = OrderedDict()
+        # for k, v in checkpoint["state_dict"].items():
+        #     new_state_dict[k.replace("backbone.", "")] = v
+        model.load_state_dict(checkpoint["state_dict"], strict=True)
         if "epoch" in checkpoint:
             start_epoch = checkpoint["epoch"]
         if "best_acc" in checkpoint:
