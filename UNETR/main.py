@@ -1,13 +1,4 @@
-# Copyright 2020 - 2021 MONAI Consortium
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#     http://www.apache.org/licenses/LICENSE-2.0
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#Code adapted from https://github.com/Project-MONAI/research-contributions/tree/main/UNETR/BTCV/main.py
 
 import argparse
 import os
@@ -123,11 +114,7 @@ parser.add_argument("--optuna_add_n_trials", default=0, type=int, help="import l
 def main():
     args = parser.parse_args()
     args.amp = not args.noamp
-    # print("REMEMBER TO CHANGE THESE LATER!!!")
-    # args.data_dir = "../../datasets/AMOS"
-    # args.model_name = "unetmv"
-    # args.logdir = "./runs/" + args.logdir
-    # args.distributed = True
+
     if args.distributed:
         args.ngpus_per_node = torch.cuda.device_count()
         print("Found total gpus", args.ngpus_per_node)

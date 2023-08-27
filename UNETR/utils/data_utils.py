@@ -216,11 +216,10 @@ class dynamicScaled(transforms.transform.MapTransform):
 
     def __call__(self, data):
         d = dict(data)       
-        d[self.img_key] = self.scaler(d[self.img_key])
-        # if d[self.type_key] == 'CT': 
-        #     d[self.img_key] = self.scaler(d[self.img_key])
-        # else:
-        #     d[self.img_key] = self.normalizer(d[self.img_key])            
+        if d[self.type_key] == 'CT': 
+            d[self.img_key] = self.scaler(d[self.img_key])
+        else:
+            d[self.img_key] = self.normalizer(d[self.img_key])            
         return d
 
 class CustomRandCropByPosNegLabeld(transforms.RandCropByPosNegLabeld):
