@@ -36,7 +36,7 @@ class CFT(MobileVitBlock):
     )->None : 
         super().__init__(in_channels, strides, dropout_rate, norm_name, act_name, transformer_dim, hidden_dim, num_heads, num_layers, img_size, patch_size, out_channels)
         
-        if mode not in ['channel', 'patch', 'all']:
+        if mode not in ['channel', 'patch', 'all', 'skip']:
             raise AssertionError("cft mode should be one of the following: 'channel', 'patch', 'all'.")
         self.mode = mode
         
