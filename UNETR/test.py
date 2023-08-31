@@ -158,7 +158,7 @@ def main():
             dice_list_case.append(mean_dice)
             hd_list_case.append(mean_hd)
 
-        print("Overall Organ Dice: {}".format(["%0.2f" % i for i in 100*np.mean(dice_list_case_org, axis = 0)]))
+        print("Overall Organ Dice: {}".format(["%0.2f" % i for i in 100*np.nanmean(dice_list_case_org, axis = 0)]))
         print("Overall Mean Dice: {}".format(np.nanmean(dice_list_case)))
         print("Overall Organ 95HD: {}".format(["%0.2f" % i for i in np.nanmean(hd_list_case_org, axis = 0)]))
         print("Overall Mean 95HD: {}".format(np.nanmean(hd_list_case)))
