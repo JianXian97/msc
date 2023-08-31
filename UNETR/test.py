@@ -140,11 +140,14 @@ def main():
 
             for i in range(1, args.out_channels):
                 organ_Dice = dice(val_outputs[0] == i, val_labels[0] == i)
+                if (val_labels[0] == i).sum() == 0:
+                    organ_Dice = np.nan
+                    
                 hd = compute_hausdorff_distance(np.expand_dims(val_outputs, 0) == i, np.expand_dims(val_labels, 0) == i, percentile=95)[0][0]
                 dice_list_sub.append(organ_Dice)
                 hd_list_sub.append(hd)
                     
-            mean_dice = np.mean(dice_list_sub)
+            mean_dice = np.nanmean(dice_list_sub)
             mean_hd = np.nanmean(hd_list_sub)
             dice_list_case_org.append(dice_list_sub)
             hd_list_case_org.append(hd_list_sub)
@@ -156,7 +159,7 @@ def main():
             hd_list_case.append(mean_hd)
 
         print("Overall Organ Dice: {}".format(["%0.2f" % i for i in 100*np.mean(dice_list_case_org, axis = 0)]))
-        print("Overall Mean Dice: {}".format(np.mean(dice_list_case)))
+        print("Overall Mean Dice: {}".format(np.nanmean(dice_list_case)))
         print("Overall Organ 95HD: {}".format(["%0.2f" % i for i in np.nanmean(hd_list_case_org, axis = 0)]))
         print("Overall Mean 95HD: {}".format(np.nanmean(hd_list_case)))
         
