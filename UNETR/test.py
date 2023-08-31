@@ -1,13 +1,4 @@
-# Copyright 2020 - 2021 MONAI Consortium
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#     http://www.apache.org/licenses/LICENSE-2.0
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#Code adapted from https://github.com/Project-MONAI/research-contributions/tree/main/UNETR/BTCV/test.py
 
 import argparse
 import os
@@ -198,11 +189,14 @@ def test_model(args, model, return_details = False):
   
             for i in range(1, args.out_channels):
                 organ_Dice = dice(val_outputs[0] == i, val_labels[0] == i)
+                if (val_labels[0] == i).sum() == 0:
+                    organ_Dice = np.nan
+    
                 hd = compute_hausdorff_distance(np.expand_dims(val_outputs, 0) == i, np.expand_dims(val_labels, 0) == i, percentile=95)[0][0]
                 dice_list_sub.append(organ_Dice)
                 hd_list_sub.append(hd)
                     
-            mean_dice = np.mean(dice_list_sub)
+            mean_dice = np.nanmean(dice_list_sub)
             mean_hd = np.nanmean(hd_list_sub)
             dice_list_case_org.append(dice_list_sub)
             hd_list_case_org.append(hd_list_sub)
@@ -214,7 +208,7 @@ def test_model(args, model, return_details = False):
             hd_list_case.append(mean_hd)
 
         print("Overall Organ Dice: {}".format(["%0.2f" % i for i in 100*np.mean(dice_list_case_org, axis = 0)]))
-        print("Overall Mean Dice: {}".format(np.mean(dice_list_case)))
+        print("Overall Mean Dice: {}".format(np.nanmean(dice_list_case)))
         print("Overall Organ 95HD: {}".format(["%0.2f" % i for i in np.nanmean(hd_list_case_org, axis = 0)]))
         print("Overall Mean 95HD: {}".format(np.nanmean(hd_list_case)))
         
